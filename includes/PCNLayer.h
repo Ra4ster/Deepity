@@ -2,7 +2,27 @@
 #include <cstddef>
 #include <memory>
 
-namespace PCN
+/**
+ * @file PCNLayer.h
+ * @brief Defines the single-layer implementation of a PC model.
+ * 
+ * This header includes implementations of inference steps, inference updates, learning, and prediction.
+ * 
+ * Usage:
+ *  #include <PCNLayer.h>
+ *  using namespace Deep;
+ * 
+ * Example:
+ *  PCLayer layer(2, 3);
+ *  layer.RunPrediction({ 0.1f, 0.75f });
+ * 
+ * @note All members are stored as unique pointers except for the input itself.
+ * @version 1.0
+ * @date 2026-06-18
+ * @author Jack Rose
+ */
+
+namespace Deep
 {
     class PCLayer
     {
@@ -51,8 +71,5 @@ namespace PCN
         std::unique_ptr<float[]> z; // Belief
         std::unique_ptr<float[]> err; // x - p
         std::unique_ptr<float[]> p; // Wz
-
-        // @internal TEMPORARY VARIABLES
-        std::unique_ptr<float[]> tmpInference;
     };
 }

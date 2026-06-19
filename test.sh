@@ -1,0 +1,1 @@
+perf stat -e cycles,instructions,cache-misses,cache-references ./bin/Deepity
