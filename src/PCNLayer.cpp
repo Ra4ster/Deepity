@@ -24,7 +24,7 @@ PCLayer::PCLayer(size_t inSize, size_t outSize, float lr, float ir, int stepSize
 {
     size_t totalSize = outSize * inSize;
 
-    this->W = std::make_unique<float[]>(totalSize + outSize + inSize + inSize);
+    this->W = std::make_unique<float[]>(totalSize);
     this->z = std::make_unique<float[]>(outSize);
 
 #pragma omp parallel
