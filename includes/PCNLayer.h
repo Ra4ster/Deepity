@@ -31,9 +31,14 @@ namespace Deep
     {
     public:
         PCLayer(size_t inSize, size_t outSize, float lr = 1e-6, float ir = 1e-6, int stepSize = 30, ActivationFn act = relu); // default
-        PCLayer(const PCLayer&) = delete;
-        PCLayer& operator=(const PCLayer&) = delete;
-        ~PCLayer(); // destructor
+
+        PCLayer(const PCLayer &) = delete;
+        PCLayer &operator=(const PCLayer&) = delete;
+
+        PCLayer(PCLayer &&other) noexcept;
+        PCLayer &operator=(PCLayer &&other) noexcept;
+
+        ~PCLayer();
 
         /// @brief Calculates prediction and returns it.
         /// @return prediction
@@ -52,6 +57,9 @@ namespace Deep
         /// @brief Updates weights using the learning rule `W += lr * e * z^T`
         /// @attention This assumes error has already been calculated
         void UpdateWeights() noexcept;
+        /// @brief Attches the layer to a pre-allocated, 64-byte aligned memory arena.
+        /// @param ptr Starting address for the buffer
+        void Attach(float *ptr) noexcept;
 
         // @internal GETTERS
         float *GetPrediction() const noexcept { return arr + pBegin; }
@@ -63,9 +71,10 @@ namespace Deep
         size_t GetInputSize() const noexcept { return inputSize; }
         size_t GetOutputSize() const noexcept { return outputSize; }
         size_t GetBatchSize() const noexcept { return B; }
+        size_t GetTotalSize() const noexcept { return totalSize; }
 
         #ifdef _DEBUG
-        void DebugStats() const;
+        void DebugStats(int layerIndex) const;
         #endif
 
     private:
@@ -86,6 +95,8 @@ namespace Deep
 
         // @internal MEMBERS
         float *arr; // Weights
+        // This tells the layer that it owns its own array, as opposed to being in a network's.
+        bool ownsArr = true;
         // @internal the following are used to reduce cache misses:
         size_t zBegin;
         size_t pBegin;

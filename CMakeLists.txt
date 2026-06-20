@@ -15,8 +15,9 @@ find_path(CBLAS_INCLUDE_DIR
 )
 
 add_executable(Deepity
-    src/main.cpp
+    tests/tNetwork.cpp
     src/PCNLayer.cpp
+    src/PCNNetwork.cpp
 )
 
 target_include_directories(Deepity PRIVATE

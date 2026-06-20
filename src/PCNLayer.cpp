@@ -55,17 +55,58 @@ PCLayer::PCLayer(size_t inSize, size_t outSize, float lr, float ir, int stepSize
             arr[i] = rng.rand<float>() * 0.02f - 0.01f;
         }
     }
-    std::cout << (reinterpret_cast<uintptr_t>(arr) % 64) << '\n';
-    std::cout
-    << "B=" << B
-    << " in=" << inputSize
-    << " out=" << outputSize
-    << " step=" << stepSize
-    << '\n';
 }
 
-PCLayer::~PCLayer() {
-    ::operator delete[](arr, std::align_val_t{64});
+PCLayer &PCLayer::operator=(PCLayer &&other) noexcept
+{
+    if (this == &other) return *this;
+
+    // Free what we currently own before overwriting
+    if (ownsArr && arr != nullptr) {
+        ::operator delete[](arr, std::align_val_t{64});
+    }
+
+    inputSize    = other.inputSize;
+    outputSize   = other.outputSize;
+    B            = other.B;
+    lr           = other.lr;
+    ir           = other.ir;
+    stepSize     = other.stepSize;
+    activation   = other.activation;
+    arr          = other.arr;
+    ownsArr      = other.ownsArr;
+    zBegin       = other.zBegin;
+    pBegin       = other.pBegin;
+    errBegin     = other.errBegin;
+    totalSize    = other.totalSize;
+    inputBuffer  = std::move(other.inputBuffer);
+    pendingCount = other.pendingCount;
+
+    other.arr     = nullptr;
+    other.ownsArr = false;
+
+    return *this;
+}
+
+PCLayer::~PCLayer()
+{
+    if (ownsArr && arr != nullptr) {
+        ::operator delete[](arr, std::align_val_t{64});
+        arr = nullptr;
+    }
+}
+
+PCLayer::PCLayer(PCLayer &&other) noexcept
+    : inputSize(other.inputSize), outputSize(other.outputSize),
+      B(other.B), lr(other.lr), ir(other.ir), stepSize(other.stepSize),
+      activation(other.activation), arr(other.arr), ownsArr(other.ownsArr),
+      zBegin(other.zBegin), pBegin(other.pBegin),
+      errBegin(other.errBegin), totalSize(other.totalSize),
+      inputBuffer(std::move(other.inputBuffer)),
+      pendingCount(other.pendingCount)
+{
+    other.arr = nullptr;
+    other.ownsArr = false;
 }
 
 void PCLayer::CalcPrediction() noexcept
@@ -138,6 +179,35 @@ void PCLayer::Flush() noexcept
     }
 }
 
+void PCLayer::Attach(float *ptr) noexcept
+{
+    assert (ptr);
+
+    if (ownsArr && arr != nullptr) {
+        ::operator delete[](arr, std::align_val_t{64});
+    }
+
+    this->arr = ptr;
+    ownsArr = false;
+
+    #pragma omp parallel
+    {
+        uint64_t thread_seed = base_seed + (uint64_t)omp_get_thread_num();
+        RNG rng(thread_seed, 0);
+
+        #pragma omp for
+        for (size_t i=0; i < pBegin; i++) {
+            arr[i] = rng.rand<float>() * 0.02f - 0.01f;
+        }
+    }
+
+    #ifdef _DEBUG
+    std::cout << "[Deepity] Layer attached. Alignment check: " 
+              << (reinterpret_cast<uintptr_t>(arr) % 64 == 0 ? "PASSED" : "FAILED") 
+              << " | Total elements: " << totalSize << '\n';
+    #endif
+}
+
 void PCLayer::UpdateWeights() noexcept
 {
     cblas_sgemm(
@@ -153,41 +223,61 @@ void PCLayer::UpdateWeights() noexcept
 }
 
 #ifdef _DEBUG
-void PCLayer::DebugStats() const
+
+#include <iomanip>
+
+void PCLayer::DebugStats(int layerIndex) const
 {
-    auto print_region = [&](const char* name,
-                            size_t begin,
-                            size_t end)
+    auto print_region = [&](const char* name, size_t begin, size_t end)
     {
-        size_t nan_count = 0;
-        size_t inf_count = 0;
-        float max_abs = 0.0f;
-        double checksum = 0.0;
+        size_t size = end - begin;
+        if (size == 0) return;
+
+        size_t nan_count = 0, inf_count = 0, zero_count = 0;
+        float min_val = arr[begin];
+        float max_val = arr[begin];
+        double sum = 0.0, sq_sum = 0.0;
 
         for (size_t i = begin; i < end; ++i)
         {
             const float v = arr[i];
 
-            if (std::isnan(v))
-                nan_count++;
-
-            if (std::isinf(v))
-                inf_count++;
-
-            max_abs = std::max(max_abs, std::abs(v));
-            checksum += v;
+            if (std::isnan(v)) nan_count++;
+            else if (std::isinf(v)) inf_count++;
+            else {
+                if (v == 0.0f) zero_count++;
+                min_val = std::min(min_val, v);
+                max_val = std::max(max_val, v);
+                sum += v;
+                sq_sum += static_cast<double>(v) * v;
+            }
         }
 
-        std::cout
-            << name
-            << ": size=" << (end - begin)
-            << " nan=" << nan_count
-            << " inf=" << inf_count
-            << " max_abs=" << max_abs
-            << " checksum=" << checksum
-            << '\n';
+        double mean = sum / size;
+        double variance = (sq_sum / size) - (mean * mean);
+        double stddev = std::sqrt(std::max(0.0, variance));
+        float sparsity = (static_cast<float>(zero_count) / size) * 100.0f;
+
+        // Formatted Console Output
+        std::cout << std::left << std::setw(5) << name 
+                  << " | N=" << std::setw(8) << size
+                  << " | Min: " << std::setw(9) << min_val 
+                  << " | Max: " << std::setw(9) << max_val 
+                  << " | Mean: " << std::setw(9) << mean 
+                  << " | Std: " << std::setw(9) << stddev 
+                  << " | Zero: " << std::setw(5) << std::fixed << std::setprecision(1) << sparsity << "%";
+
+        if (nan_count > 0 || inf_count > 0) {
+            std::cout << "  [ALARM: " << nan_count << " NaNs, " << inf_count << " Infs!]";
+        }
+        std::cout << '\n';
+        std::cout.unsetf(std::ios_base::floatfield); // reset precision
     };
 
+    std::cout << "--------------------------------------------------------------------------------------\n";
+    std::cout << " LAYER " << layerIndex << " DIAGNOSTICS (In: " << inputSize << ", Out: " << outputSize << ")\n";
+    std::cout << "--------------------------------------------------------------------------------------\n";
+    
     print_region("W",   0,        zBegin);
     print_region("Z",   zBegin,   pBegin);
     print_region("P",   pBegin,   errBegin);
