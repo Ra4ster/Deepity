@@ -1,19 +1,20 @@
 #pragma once
 #include <cstddef>
+#include <cmath>
 #include <immintrin.h>
 
 /**
  * @file Activations.h
  * @brief Defines the activation functions of a predictive coding model.
- * 
+ *
  * This header includes implementations of ReLU and TanH.
- * 
+ *
  * Usage:
  *  #include <Activations.h>
- * 
+ *
  * Example:
  *  Deep::tanh(array, arraysize)
- * 
+ *
  * @note Separate implementations exist for AVX512F, AVX2, SSE, and naive.
  * @version 1.0
  * @date 2026-06-21
@@ -118,7 +119,8 @@ namespace Deep
             y = _mm512_mask_blend_ps(bigmaskpo, y, positive1);
 
             __m512 g = _mm512_mask_mov_ps(zeros, midmask, y);
-            __m512 g2 = _mm512_mul_ps(g, g);
+            __m512 g2 = _mm512_fmadd_ps(g, g, zeros);
+            // Legacy: __m512 g2 = _mm512_mul_ps(g, g);
 
             __m512 num = _mm512_fmadd_ps(mmp3, g2, mmp2);
             num = _mm512_fmadd_ps(num, g2, mmp1);
@@ -127,7 +129,8 @@ namespace Deep
             den = _mm512_fmadd_ps(den, g2, mmq1);
             den = _mm512_fmadd_ps(den, g2, positive1);
 
-            __m512 poly = _mm512_fmadd_ps(g, _mm512_mul_ps(g2, _mm512_div_ps(num, den)), g);
+            __m512 poly = _mm512_fmadd_ps(g, _mm512_fmadd_ps(g2, _mm512_div_ps(num, den), zeros), g);
+            // Legacy: __m512 poly = _mm512_fmadd_ps(g, _mm512_mul_ps(g2, _mm512_div_ps(num, den)), g);
 
             y = _mm512_mask_mov_ps(y, midmask, poly);
             _mm512_store_ps(x + i, y);
@@ -143,6 +146,7 @@ namespace Deep
         __m256 neg_big_check = _mm256_set1_ps(-TANH_BIGLIMIT);
         __m256 negative1 = _mm256_set1_ps(-1.0f);
         __m256 positive1 = _mm256_set1_ps(1.0f);
+        __m256 zeros = _mm256_set1_ps(0.0f);
         __m256 allones = _mm256_castsi256_ps(_mm256_set1_epi32(-1));
         __m256 mmp1 = _mm256_set1_ps(p1);
         __m256 mmp2 = _mm256_set1_ps(p2);
@@ -167,7 +171,8 @@ namespace Deep
             y = _mm256_blendv_ps(y, positive1, bigmaskpo);
 
             __m256 g = _mm256_and_ps(y, midmask);
-            __m256 g2 = _mm256_mul_ps(g, g);
+            __m256 g2 = _mm256_fmadd_ps(g, g, zeros);
+            // Legacy: __m256 g2 = _mm256_mul_ps(g, g);
 
             __m256 num = _mm256_fmadd_ps(mmp3, g2, mmp2);
             num = _mm256_fmadd_ps(num, g2, mmp1);
@@ -176,7 +181,8 @@ namespace Deep
             den = _mm256_fmadd_ps(den, g2, mmq1);
             den = _mm256_fmadd_ps(den, g2, positive1);
 
-            __m256 poly = _mm256_fmadd_ps(g, _mm256_mul_ps(g2, _mm256_div_ps(num, den)), g);
+            __m256 poly = _mm256_fmadd_ps(g, _mm256_fmadd_ps(g2, _mm256_div_ps(num, den), zeros), g);
+            // Legacy: __m256 poly = _mm256_fmadd_ps(g, _mm256_mul_ps(g2, _mm256_div_ps(num, den)), g);
 
             y = _mm256_blendv_ps(y, poly, midmask);
             _mm256_store_ps(x + i, y);
@@ -192,6 +198,7 @@ namespace Deep
         __m128 neg_big_check = _mm_set1_ps(-TANH_BIGLIMIT);
         __m128 negative1 = _mm_set1_ps(-1.0f);
         __m128 positive1 = _mm_set1_ps(1.0f);
+        __m128 zeros = _mm_set1_ps(0.0f);
         __m128 allones = _mm_castsi128_ps(_mm_set1_epi32(-1));
         __m128 mmp1 = _mm_set1_ps(p1);
         __m128 mmp2 = _mm_set1_ps(p2);
@@ -216,8 +223,13 @@ namespace Deep
             y = _mm_blendv_ps(y, positive1, bigmaskpo);
 
             __m128 g = _mm_and_ps(y, midmask);
+#ifdef __FMA__
+            __m128 g2 = _mm_fmadd_ps(g, g, zeros);
+#else
             __m128 g2 = _mm_mul_ps(g, g);
+#endif
 
+#ifdef __FMA__
             __m128 num = _mm_fmadd_ps(mmp3, g2, mmp2);
             num = _mm_fmadd_ps(num, g2, mmp1);
 
@@ -225,7 +237,17 @@ namespace Deep
             den = _mm_fmadd_ps(den, g2, mmq1);
             den = _mm_fmadd_ps(den, g2, positive1);
 
-            __m128 poly = _mm_fmadd_ps(g, _mm_mul_ps(g2, _mm_div_ps(num, den)), g);
+            __m128 poly = _mm_fmadd_ps(g, _mm_fmadd_ps(g2, _mm_div_ps(num, den), zeros), g);
+#else
+            __m128 num = _mm_add_ps(_mm_mul_ps(mmp3, g2), mmp2);
+            num = _mm_add_ps(_mm_mul_ps(num, g2), mmp1);
+
+            __m128 den = _mm_add_ps(_mm_mul_ps(positive1, g2), mmq2);
+            den = _mm_add_ps(_mm_mul_ps(den, g2), mmq1);
+            den = _mm_add_ps(_mm_mul_ps(den, g2), positive1);
+
+            __m128 poly = _mm_add_ps(_mm_mul_ps(g, _mm_mul_ps(g2, _mm_div_ps(num, den))), g);
+#endif
 
             y = _mm_blendv_ps(y, poly, midmask);
             _mm_store_ps(x + i, y);
@@ -244,6 +266,74 @@ namespace Deep
                 float g = v * v;
                 x[i] = v + v * g * (((p3 * g + p2) * g + p1) / (((g + q2) * g + q1) * g + 1.0f));
             }
+        }
+    }
+
+    /// @brief Implements the \em Elliot \em Sigmoid approximation, i.e. `S(x) = (1/2)((x / (1 + |x|)) + 1)`
+    /// @param x array, \em assumed to be 64-bit aligned!
+    /// @param n x length
+    inline void sigmoid(float *x, size_t n)
+    {
+        size_t i = 0;
+
+#if defined(__AVX512F__)
+        __m512 half = _mm512_set1_ps(0.5f);
+        __m512 one = _mm512_set1_ps(1.0f);
+        size_t r = n % 16;
+        size_t simd_end = n - r;
+        for (; i < simd_end; i += 16)
+        {
+            __m512 x_512 = _mm512_load_ps(x + i);
+            __m512 den = _mm512_add_ps(
+                _mm512_abs_ps(x_512),
+                one);
+            __m512 div = _mm512_div_ps(x_512, den);
+            __m512 sig = _mm512_fmadd_ps(div, half, half);
+
+            _mm512_store_ps(x + i, sig);
+        }
+#elif defined(__AVX2__)
+        __m256 half = _mm256_set1_ps(0.5f);
+        __m256 one = _mm256_set1_ps(1.0f);
+        __m256 mask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7FFFFFFF)); // for 256-bit abs
+        size_t r = n % 8;
+        size_t simd_end = n - r;
+        for (; i < simd_end; i += 8)
+        {
+            __m256 x_256 = _mm256_load_ps(x + i);
+            __m256 den = _mm256_add_ps(
+                _mm256_and_ps(x_256, mask),
+                one);
+            __m256 div = _mm256_div_ps(x_256, den);
+            __m256 sig = _mm256_fmadd_ps(div, half, half);
+
+            _mm256_store_ps(x + i, sig);
+        }
+#elif defined(__SSE4_1__) || defined(_M_AMD64) || defined(_M_X64)
+        __m128 half = _mm_set1_ps(0.5f);
+        __m128 one = _mm_set1_ps(1.0f);
+        __m128 mask = _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF)); // for 256-bit abs
+        size_t r = n % 4;
+        size_t simd_end = n - r;
+        for (; i < simd_end; i += 4)
+        {
+            __m128 x_128 = _mm_load_ps(x + i);
+            __m128 den = _mm_add_ps(
+                _mm_and_ps(x_128, mask),
+                one);
+            __m128 div = _mm_div_ps(x_128, den);
+#ifdef __FMA__
+            __m128 sig = _mm_fmadd_ps(div, half, half);
+#else
+            __m128 sig = _mm_add_ps(_mm_mul_ps(div, half), half);
+#endif
+
+            _mm_store_ps(x + i, sig);
+        }
+#endif
+        for (; i < n; i++)
+        {
+            x[i] = 0.5f * (x[i] / (1.0f + fabsf(x[i])) + 1.0f);
         }
     }
 }

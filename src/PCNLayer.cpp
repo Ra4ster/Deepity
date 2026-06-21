@@ -210,7 +210,7 @@ void PCLayer::Attach(float *ptr) noexcept
 
 void PCLayer::UpdateWeights() noexcept
 {
-    cblas_sgemm(
+    cblas_sgemm( // W += lr * e^T * z 
     CblasRowMajor, CblasTrans, CblasNoTrans,
     inputSize,  // M
     outputSize, // N
