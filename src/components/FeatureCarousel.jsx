@@ -76,14 +76,34 @@ function FeatureCarousel() {
   return (
     <div
       id="featureCarousel"
-      className="carousel slide position-relative"
+      className="carousel slide position-relative cards"
       style={{
         marginLeft: "1rem",
         marginRight: "1rem",
         padding: "3rem 4rem",
         overflow: "hidden",
+        background: "var(--panel)",
+        opacity: "0.9",
+        border: "1px solid var(--border)",
+        borderRadius: "1rem",
+        boxShadow: "0 20px 60px -20px rgba(0, 0, 0, 0.5)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
       }}
     >
+      {/* left/right edge fade so the panel doesn't feel like a hard-edged
+          rectangle dropped onto the hero section */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          background:
+            "linear-gradient(to right, var(--panel) 0%, rgba(19,27,43,0) 8%, rgba(19,27,43,0) 92%, var(--panel) 100%)",
+        }}
+      />
+
       <div className="carousel-inner overflow-hidden">
         <div
           className="d-flex"

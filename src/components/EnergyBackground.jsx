@@ -1,59 +1,109 @@
 import { useEffect, useRef, useState } from "react";
 
-// Vanta's npm package doesn't declare an "exports" map, which trips up
-// Vite's import-analysis when resolving deep subpaths like
-// "vanta/dist/vanta.topology.min" even though the file exists on disk.
-// Loading both libraries as classic <script> tags (as Vanta's own docs
-// recommend for non-webpack setups) sidesteps that entirely — they attach
-// themselves to `window` and we just wait for them to be ready.
+// Halo is a Three.js-based Vanta effect, so load Three.js first.
+// Loading both as classic <script> tags avoids Vite's import-analysis issues
+// with Vanta's deep package paths.
+const THREE_SRC =
+  "https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js";
 
-const P5_SRC = "https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.1.9/p5.min.js";
-const VANTA_TOPOLOGY_SRC =
-  "https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.24/vanta.topology.min.js";
+const VANTA_HALO_SRC =
+  "https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.24/vanta.halo.min.js";
 
 function loadScriptOnce(src) {
   return new Promise((resolve, reject) => {
     const existing = document.querySelector(`script[src="${src}"]`);
+
     if (existing) {
-      if (existing.dataset.loaded === "true") return resolve();
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", reject);
+      if (existing.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+
+      existing.addEventListener("load", resolve, { once: true });
+      existing.addEventListener("error", reject, { once: true });
       return;
     }
+
     const script = document.createElement("script");
     script.src = src;
     script.async = true;
+
     script.onload = () => {
       script.dataset.loaded = "true";
       resolve();
     };
+
     script.onerror = reject;
+
     document.head.appendChild(script);
   });
 }
 
 function EnergyBackground({ opacity = 1 }) {
+  const backgroundRef = useRef(null);
   const containerRef = useRef(null);
   const vantaRef = useRef(null);
   const destroyTimeoutRef = useRef(null);
+
   const [reduceMotion, setReduceMotion] = useState(false);
 
+  // Detect reduced-motion preference.
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+
     setReduceMotion(mq.matches);
+
+    const handleChange = (event) => {
+      setReduceMotion(event.matches);
+    };
+
+    mq.addEventListener?.("change", handleChange);
+
+    return () => {
+      mq.removeEventListener?.("change", handleChange);
+    };
   }, []);
 
+  // Subtle 15% upward parallax on scroll.
   useEffect(() => {
-    // No built-in static mode in Vanta, so reduced-motion users just get the
-    // flat background color and we skip mounting the canvas altogether.
     if (reduceMotion) return;
 
-    // React 18 Strict Mode runs this effect's cleanup and then re-runs the
-    // effect again immediately on every dev mount, to help surface bugs.
-    // Cancel any destroy the immediately-preceding pass just scheduled below
-    // — if we're here, that was Strict Mode's practice run, not a real
-    // unmount, and the Vanta instance it built (or is still building)
-    // should be kept rather than torn down.
+    let animationFrameId;
+    let lastScrollTop = -1;
+
+    const renderLoop = () => {
+      // Read the raw scroll value directly from the window/document on every frame,
+      // completely bypassing the broken event pipeline.
+      const scrollTop =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+
+      // Only touch the DOM if the user actually moved to save performance
+      if (scrollTop !== lastScrollTop && backgroundRef.current) {
+        // -0.85 moves the background up slightly slower than the actual scroll
+        const offset = scrollTop * -0.65;
+
+        backgroundRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
+        lastScrollTop = scrollTop;
+      }
+
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
+
+    // Kick off the loop
+    renderLoop();
+
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [reduceMotion]);
+
+  // Initialize Vanta Halo.
+  useEffect(() => {
+    if (reduceMotion) return;
+
+    // React 18 Strict Mode can run cleanup/re-initialization immediately
+    // during development. Cancel a pending destroy if that happens.
     if (destroyTimeoutRef.current !== null) {
       clearTimeout(destroyTimeoutRef.current);
       destroyTimeoutRef.current = null;
@@ -63,16 +113,21 @@ function EnergyBackground({ opacity = 1 }) {
 
     async function init() {
       console.log(`[EnergyBackground:${runId}] init start`);
+
       try {
-        await loadScriptOnce(P5_SRC);
+        // Halo requires Three.js.
+        await loadScriptOnce(THREE_SRC);
+
         console.log(
-          `[EnergyBackground:${runId}] p5 loaded, window.p5 =`,
-          window.p5,
+          `[EnergyBackground:${runId}] Three.js loaded:`,
+          window.THREE,
         );
 
-        await loadScriptOnce(VANTA_TOPOLOGY_SRC);
+        // Load Vanta Halo after Three.js.
+        await loadScriptOnce(VANTA_HALO_SRC);
+
         console.log(
-          `[EnergyBackground:${runId}] vanta script loaded, window.VANTA =`,
+          `[EnergyBackground:${runId}] Vanta Halo loaded:`,
           window.VANTA,
         );
 
@@ -83,74 +138,66 @@ function EnergyBackground({ opacity = 1 }) {
           return;
         }
 
-        if (!window.VANTA || !window.VANTA.TOPOLOGY) {
+        if (!window.VANTA || !window.VANTA.HALO) {
           console.error(
-            `[EnergyBackground:${runId}] window.VANTA.TOPOLOGY is missing ` +
-              "after script load — the CDN file likely loaded an unexpected " +
-              "version, or another script cleared window.VANTA.",
+            `[EnergyBackground:${runId}] window.VANTA.HALO is missing`,
           );
           return;
         }
 
-        // Dedup: Strict Mode may have started this same init sequence
-        // twice. Once both awaits above resolve, check whether an earlier
-        // pass already finished building the effect — if so, don't build a
-        // second one on top of it.
+        // Avoid creating multiple effects during Strict Mode.
         if (vantaRef.current) {
           console.log(
-            `[EnergyBackground:${runId}] skipping — effect already built by an earlier pass`,
+            `[EnergyBackground:${runId}] skipping — effect already exists`,
           );
           return;
         }
 
-        // Common silent-failure case: the container renders at 0x0 because
-        // its positioned ancestor has no explicit height (an absolutely
-        // positioned element doesn't contribute to its parent's height).
-        // Vanta won't error on this — it'll just paint nothing.
         const { width, height } = containerRef.current.getBoundingClientRect();
+
         console.log(
-          `[EnergyBackground:${runId}] container size at init:`,
+          `[EnergyBackground:${runId}] container size:`,
           width,
           height,
         );
+
         if (width === 0 || height === 0) {
           console.warn(
-            `[EnergyBackground:${runId}] container is 0x0 — Vanta will ` +
-              "render nothing. Give the parent element `position: relative` " +
-              "and an explicit height (e.g. minHeight: '100vh').",
+            `[EnergyBackground:${runId}] container is 0x0 — Vanta will render nothing.`,
           );
         }
 
-        vantaRef.current = window.VANTA.TOPOLOGY({
+        vantaRef.current = window.VANTA.HALO({
           el: containerRef.current,
-          mouseControls: true,
+
+          mouseControls: false,
           touchControls: true,
           gyroControls: false,
+
           minHeight: 200.0,
           minWidth: 200.0,
-          scale: 1.0,
-          scaleMobile: 0.75,
+
+          baseColor: 0x00111c,
           backgroundColor: 0x00111c,
-          color: 0x4169e1,
+
+          amplitudeFactor: 1.5,
+
+          // Shift Halo toward the right.
+          xOffset: 0.25,
+          yOffset: 0.25,
+
+          size: 1.0,
         });
 
-        // Exposed for manual inspection in DevTools: run
-        // `window.__vantaEffect` in the console to check it's a real
-        // object, and `document.querySelectorAll('canvas')` to see every
-        // canvas currently on the page (in case one landed outside this
-        // container — a known failure mode if p5/Vanta versions mismatch).
         window.__vantaEffect = vantaRef.current;
+
         console.log(
-          `[EnergyBackground:${runId}] Vanta effect created:`,
+          `[EnergyBackground:${runId}] Halo effect created:`,
           vantaRef.current,
-          "canvas in container:",
-          containerRef.current.querySelector("canvas"),
-          "all canvases on page:",
-          document.querySelectorAll("canvas"),
         );
       } catch (err) {
         console.error(
-          `[EnergyBackground:${runId}] failed to load/init Vanta:`,
+          `[EnergyBackground:${runId}] failed to load/init Vanta Halo:`,
           err,
         );
       }
@@ -159,16 +206,21 @@ function EnergyBackground({ opacity = 1 }) {
     init();
 
     return () => {
-      console.log(`[EnergyBackground:${runId}] cleanup scheduled (deferred)`);
-      // Defer the actual destroy by a tick. If this was just Strict Mode's
-      // practice unmount, the next effect invocation (which runs
-      // synchronously right after) will clear this timeout before it ever
-      // fires. If the component is really gone, nothing cancels it and the
-      // destroy runs for real.
+      console.log(`[EnergyBackground:${runId}] cleanup scheduled`);
+
+      // Defer destruction so React Strict Mode's development-only
+      // mount → cleanup → mount cycle doesn't unnecessarily destroy
+      // and recreate the Vanta instance.
       destroyTimeoutRef.current = setTimeout(() => {
         console.log(`[EnergyBackground:${runId}] destroying for real`);
+
         vantaRef.current?.destroy();
         vantaRef.current = null;
+
+        if (window.__vantaEffect) {
+          delete window.__vantaEffect;
+        }
+
         destroyTimeoutRef.current = null;
       }, 0);
     };
@@ -176,22 +228,41 @@ function EnergyBackground({ opacity = 1 }) {
 
   return (
     <div
-      ref={containerRef}
+      ref={backgroundRef}
       style={{
-        position: "fixed" /* Changed from sticky */,
+        position: "fixed",
         top: 0,
-        left: 0 /* Added to guarantee it pins to the edge */,
-        height: "100dvh",
+        left: 0,
         width: "100%",
-        maxWidth: "100vw",
-        /* Removed marginBottom: "-100dvh" as it is no longer needed */
+
+        // INCREASED HEIGHT: gives the background bleed room
+        // at the bottom so parallax doesn't pull it off-screen.
+        height: "150dvh",
+
+        // Background layer.
         zIndex: 0,
-        opacity,
-        backgroundColor: "#00111c",
-        pointerEvents: "auto",
+
+        pointerEvents: "none",
         overflow: "hidden",
+
+        // Makes the parallax transform smoother.
+        willChange: "transform",
       }}
-    />
+    >
+      <div
+        ref={containerRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+
+          width: "100%",
+          height: "100%",
+
+          opacity,
+          backgroundColor: "#00111c",
+        }}
+      />
+    </div>
   );
 }
 

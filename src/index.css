@@ -68,6 +68,7 @@ div {
 .bg {
   min-height: 100vh;
   min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @media (max-width: 991.98px) {
@@ -82,6 +83,11 @@ div {
   }
 }
 
+/* TEMP: Helium is reporting prefers-reduced-motion as always-true regardless
+   of OS/browser settings, which was killing .magic-text's animation-pan and
+   every other CSS animation site-wide. Disabled for now to verify animations
+   work; restore this block once the Helium issue is sorted out. */
+/*
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -91,10 +97,7 @@ div {
     transition-duration: 0.01ms !important;
   }
 }
-
-.bg {
-  padding-bottom: env(safe-area-inset-bottom);
-}
+*/
 
 .star-icon {
   transition: filter ease-in-out;

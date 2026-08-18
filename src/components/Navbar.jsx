@@ -18,7 +18,10 @@ function Navbar() {
   return (
     <nav
       className="navbar navbar-expand-lg navbar-dark py-3 sticky-top"
-      style={{ backgroundColor: "#00111c", borderBottom: "1px solid #202d3b" }}
+      style={{
+        backgroundColor: "rgba(0, 17, 28, 0.8)",
+        borderBottom: "1px solid #202d3b",
+      }}
     >
       {" "}
       <a
@@ -26,7 +29,7 @@ function Navbar() {
         href="#"
       >
         <img
-          src="/chicken-96.png"
+          src="chicken-96.png"
           width="32"
           height="32"
           className="d-inline-block align-top me-2 ms-3"

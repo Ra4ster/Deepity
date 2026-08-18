@@ -14,8 +14,6 @@ import EnergyBackground from "./components/EnergyBackground";
 function HomePage() {
   return (
     <div className="min-vh-100 bg position-relative">
-      <EnergyBackground opacity="0.3" />
-
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* Hero Section */}
         <div className="container-fluid px-3 px-md-5 py-5">
@@ -99,7 +97,7 @@ function HomePage() {
 
                 <a
                   href="https://github.com/ra4ster/deepity/stargazers"
-                  className="btn btn-outline-light border-secondary d-flex align-items-center justify-content-center text-decoration-none touch-button"
+                  className="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center text-decoration-none touch-button"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
