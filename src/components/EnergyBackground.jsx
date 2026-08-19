@@ -46,14 +46,6 @@ function EnergyBackground({ opacity = 1 }) {
 
   const [reduceMotion, setReduceMotion] = useState(false);
 
-  // Percentage height on an absolutely positioned element only resolves if
-  // its containing block has an *explicit* height. Our relative wrapper in
-  // App.jsx doesn't set one (its height is just whatever its content adds
-  // up to), so `height: "100%"` can't compute against it. Instead, measure
-  // the real document height in JS and apply it as an explicit pixel value,
-  // keeping it in sync as content/layout changes.
-  const [pageHeight, setPageHeight] = useState(0);
-
   // Detect reduced-motion preference.
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -71,40 +63,9 @@ function EnergyBackground({ opacity = 1 }) {
     };
   }, []);
 
-  // Keep pageHeight in sync with the document's actual scrollable height.
-  useEffect(() => {
-    const measure = () => {
-      const doc = document.documentElement;
-      const body = document.body;
-
-      const height = Math.max(
-        doc.scrollHeight,
-        doc.offsetHeight,
-        body.scrollHeight,
-        body.offsetHeight,
-      );
-
-      setPageHeight(height);
-
-      // Vanta effects size their canvas from the container's bounding
-      // rect on window "resize" events; a height change driven by React
-      // state (e.g. route change, content loading in) isn't a resize
-      // event, so nudge Vanta to recalculate explicitly.
-      vantaRef.current?.resize?.();
-    };
-
-    measure();
-
-    window.addEventListener("resize", measure);
-
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(document.body);
-
-    return () => {
-      window.removeEventListener("resize", measure);
-      resizeObserver.disconnect();
-    };
-  }, []);
+  // The container is now `position: fixed` and sized to the viewport, so
+  // Vanta's own internal window "resize" listener keeps its canvas in sync
+  // automatically — no manual height measurement needed.
 
   // Initialize Vanta Fog.
   useEffect(() => {
@@ -164,8 +125,8 @@ function EnergyBackground({ opacity = 1 }) {
           lowlightColor: 0x0, // consider 0x2eff,
           baseColor: 0x0,
 
-          blurFactor: 0.6,
-          zoom: 0.3,
+          blurFactor: 0.9,
+          zoom: 0.5,
           speed: 1.0,
         });
 
@@ -201,16 +162,14 @@ function EnergyBackground({ opacity = 1 }) {
     <div
       ref={containerRef}
       style={{
-        // Absolute (not fixed): scrolls with the rest of the page instead
-        // of staying pinned to the viewport. Height is an explicit pixel
-        // value from the measurement effect above (percentage height won't
-        // resolve here — see comment on pageHeight). Falls back to 100dvh
-        // for the very first render, before the first measurement runs.
-        position: "absolute",
+        // Fixed: pinned to the viewport instead of scrolling with page
+        // content, so it always covers the visible area regardless of how
+        // tall the page is — no need to measure/track document height.
+        position: "fixed",
         top: 0,
         left: 0,
-        width: "100%",
-        height: pageHeight ? `${pageHeight}px` : "100dvh",
+        width: "100vw",
+        height: "100dvh",
 
         zIndex: 0,
 

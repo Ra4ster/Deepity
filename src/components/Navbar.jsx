@@ -56,7 +56,7 @@ function Navbar() {
         {" "}
         <a
           className="navbar-brand Inter fs-3 fw-semibold py-0 d-flex align-items-center"
-          href="#"
+          href="/Deepity/"
         >
           <img
             src="chicken-96.png"
@@ -89,7 +89,7 @@ function Navbar() {
             <a className="nav-item nav-link" href="/Deepity/docs/index.html">
               Docs
             </a>
-            <a className="nav-item nav-link" href="#Tutorials">
+            <a className="nav-item nav-link" href="/Deepity/tutorials">
               Tutorials
             </a>
             <a className="nav-item nav-link" href="#API">
