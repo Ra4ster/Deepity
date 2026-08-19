@@ -8,7 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 export default function App() {
   return (
     <>
-      <EnergyBackground opacity="0.75" />
+      <EnergyBackground opacity="1.0" />
       <div style={{ position: "relative", zIndex: 1 }}>
         <BrowserRouter basename="/Deepity">
           <Navbar />

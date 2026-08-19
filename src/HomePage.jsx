@@ -96,7 +96,7 @@ function HomePage() {
                 </a>
 
                 <a
-                  href="https://github.com/ra4ster/deepity/stargazers"
+                  href="https://github.com/ra4ster/deepity/"
                   className="btn btn-outline-secondary text-light d-flex align-items-center justify-content-center text-decoration-none touch-button"
                   target="_blank"
                   rel="noopener noreferrer"

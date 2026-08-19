@@ -30,9 +30,9 @@ function Footer1() {
 
       {/* Allowed buttons to wrap and added top margin for mobile */}
       <div className="ms-md-auto mt-4 mt-md-0 d-flex flex-wrap justify-content-center gap-2 me-md-3">
-        <button type="button" className="btn btn-outline-light">
+        <a href="/Deepity/docs/index.html" className="btn btn-outline-light">
           Read the docs
-        </button>
+        </a>
         <button type="button" className="btn btn-outline-primary">
           Explore Benchmarks
         </button>

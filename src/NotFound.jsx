@@ -4,7 +4,10 @@ function NotFound() {
   return (
     <div className="min-vh-100 bg position-relative d-flex align-items-center justify-content-center">
       <div className="text-center px-3">
-        <h1 className="text-white fw-bold hero-title mb-3">
+        <h1
+          className="text-white fw-bold hero-title mb-3"
+          style={{ filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8))" }}
+        >
           Under <span className="magic-text">Construction</span>
         </h1>
 

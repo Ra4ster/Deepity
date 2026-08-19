@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
-// Halo is a Three.js-based Vanta effect, so load Three.js first.
+// Fog is a Three.js-based Vanta effect, so load Three.js first.
 // Loading both as classic <script> tags avoids Vite's import-analysis issues
 // with Vanta's deep package paths.
 const THREE_SRC =
   "https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js";
 
-const VANTA_HALO_SRC =
-  "https://cdnjs.cloudflare.com/ajax/libs/vanta/0.5.24/vanta.halo.min.js";
+const VANTA_FOG_SRC =
+  "https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.fog.min.js";
 
 function loadScriptOnce(src) {
   return new Promise((resolve, reject) => {
@@ -40,12 +40,19 @@ function loadScriptOnce(src) {
 }
 
 function EnergyBackground({ opacity = 1 }) {
-  const backgroundRef = useRef(null);
   const containerRef = useRef(null);
   const vantaRef = useRef(null);
   const destroyTimeoutRef = useRef(null);
 
   const [reduceMotion, setReduceMotion] = useState(false);
+
+  // Percentage height on an absolutely positioned element only resolves if
+  // its containing block has an *explicit* height. Our relative wrapper in
+  // App.jsx doesn't set one (its height is just whatever its content adds
+  // up to), so `height: "100%"` can't compute against it. Instead, measure
+  // the real document height in JS and apply it as an explicit pixel value,
+  // keeping it in sync as content/layout changes.
+  const [pageHeight, setPageHeight] = useState(0);
 
   // Detect reduced-motion preference.
   useEffect(() => {
@@ -64,41 +71,42 @@ function EnergyBackground({ opacity = 1 }) {
     };
   }, []);
 
-  // Subtle 15% upward parallax on scroll.
+  // Keep pageHeight in sync with the document's actual scrollable height.
   useEffect(() => {
-    if (reduceMotion) return;
+    const measure = () => {
+      const doc = document.documentElement;
+      const body = document.body;
 
-    let animationFrameId;
-    let lastScrollTop = -1;
+      const height = Math.max(
+        doc.scrollHeight,
+        doc.offsetHeight,
+        body.scrollHeight,
+        body.offsetHeight,
+      );
 
-    const renderLoop = () => {
-      // Read the raw scroll value directly from the window/document on every frame,
-      // completely bypassing the broken event pipeline.
-      const scrollTop =
-        window.scrollY ||
-        document.documentElement.scrollTop ||
-        document.body.scrollTop ||
-        0;
+      setPageHeight(height);
 
-      // Only touch the DOM if the user actually moved to save performance
-      if (scrollTop !== lastScrollTop && backgroundRef.current) {
-        // -0.85 moves the background up slightly slower than the actual scroll
-        const offset = scrollTop * -0.65;
-
-        backgroundRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
-        lastScrollTop = scrollTop;
-      }
-
-      animationFrameId = requestAnimationFrame(renderLoop);
+      // Vanta effects size their canvas from the container's bounding
+      // rect on window "resize" events; a height change driven by React
+      // state (e.g. route change, content loading in) isn't a resize
+      // event, so nudge Vanta to recalculate explicitly.
+      vantaRef.current?.resize?.();
     };
 
-    // Kick off the loop
-    renderLoop();
+    measure();
 
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [reduceMotion]);
+    window.addEventListener("resize", measure);
 
-  // Initialize Vanta Halo.
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(document.body);
+
+    return () => {
+      window.removeEventListener("resize", measure);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Initialize Vanta Fog.
   useEffect(() => {
     if (reduceMotion) return;
 
@@ -112,24 +120,12 @@ function EnergyBackground({ opacity = 1 }) {
     const runId = Math.random().toString(36).slice(2, 7);
 
     async function init() {
-      console.log(`[EnergyBackground:${runId}] init start`);
-
       try {
-        // Halo requires Three.js.
+        // Fog requires Three.js.
         await loadScriptOnce(THREE_SRC);
 
-        console.log(
-          `[EnergyBackground:${runId}] Three.js loaded:`,
-          window.THREE,
-        );
-
-        // Load Vanta Halo after Three.js.
-        await loadScriptOnce(VANTA_HALO_SRC);
-
-        console.log(
-          `[EnergyBackground:${runId}] Vanta Halo loaded:`,
-          window.VANTA,
-        );
+        // Load Vanta Fog after Three.js.
+        await loadScriptOnce(VANTA_FOG_SRC);
 
         if (!containerRef.current) {
           console.log(
@@ -138,9 +134,9 @@ function EnergyBackground({ opacity = 1 }) {
           return;
         }
 
-        if (!window.VANTA || !window.VANTA.HALO) {
+        if (!window.VANTA || !window.VANTA.FOG) {
           console.error(
-            `[EnergyBackground:${runId}] window.VANTA.HALO is missing`,
+            `[EnergyBackground:${runId}] window.VANTA.FOG is missing`,
           );
           return;
         }
@@ -153,51 +149,30 @@ function EnergyBackground({ opacity = 1 }) {
           return;
         }
 
-        const { width, height } = containerRef.current.getBoundingClientRect();
-
-        console.log(
-          `[EnergyBackground:${runId}] container size:`,
-          width,
-          height,
-        );
-
-        if (width === 0 || height === 0) {
-          console.warn(
-            `[EnergyBackground:${runId}] container is 0x0 — Vanta will render nothing.`,
-          );
-        }
-
-        vantaRef.current = window.VANTA.HALO({
+        vantaRef.current = window.VANTA.FOG({
           el: containerRef.current,
 
-          mouseControls: false,
+          mouseControls: true,
           touchControls: true,
           gyroControls: false,
 
           minHeight: 200.0,
           minWidth: 200.0,
 
-          baseColor: 0x00111c,
-          backgroundColor: 0x00111c,
+          highlightColor: 0xd100ff,
+          midtoneColor: 0xb5ff,
+          lowlightColor: 0x0, // consider 0x2eff,
+          baseColor: 0x0,
 
-          amplitudeFactor: 1.5,
-
-          // Shift Halo toward the right.
-          xOffset: 0.25,
-          yOffset: 0.25,
-
-          size: 1.0,
+          blurFactor: 0.6,
+          zoom: 0.3,
+          speed: 1.0,
         });
 
         window.__vantaEffect = vantaRef.current;
-
-        console.log(
-          `[EnergyBackground:${runId}] Halo effect created:`,
-          vantaRef.current,
-        );
       } catch (err) {
         console.error(
-          `[EnergyBackground:${runId}] failed to load/init Vanta Halo:`,
+          `[EnergyBackground:${runId}] failed to load/init Vanta Fog:`,
           err,
         );
       }
@@ -206,14 +181,10 @@ function EnergyBackground({ opacity = 1 }) {
     init();
 
     return () => {
-      console.log(`[EnergyBackground:${runId}] cleanup scheduled`);
-
       // Defer destruction so React Strict Mode's development-only
       // mount → cleanup → mount cycle doesn't unnecessarily destroy
       // and recreate the Vanta instance.
       destroyTimeoutRef.current = setTimeout(() => {
-        console.log(`[EnergyBackground:${runId}] destroying for real`);
-
         vantaRef.current?.destroy();
         vantaRef.current = null;
 
@@ -228,41 +199,28 @@ function EnergyBackground({ opacity = 1 }) {
 
   return (
     <div
-      ref={backgroundRef}
+      ref={containerRef}
       style={{
-        position: "fixed",
+        // Absolute (not fixed): scrolls with the rest of the page instead
+        // of staying pinned to the viewport. Height is an explicit pixel
+        // value from the measurement effect above (percentage height won't
+        // resolve here — see comment on pageHeight). Falls back to 100dvh
+        // for the very first render, before the first measurement runs.
+        position: "absolute",
         top: 0,
         left: 0,
         width: "100%",
+        height: pageHeight ? `${pageHeight}px` : "100dvh",
 
-        // INCREASED HEIGHT: gives the background bleed room
-        // at the bottom so parallax doesn't pull it off-screen.
-        height: "150dvh",
-
-        // Background layer.
         zIndex: 0,
 
         pointerEvents: "none",
         overflow: "hidden",
 
-        // Makes the parallax transform smoother.
-        willChange: "transform",
+        opacity,
+        backgroundColor: "#00111c",
       }}
-    >
-      <div
-        ref={containerRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-
-          width: "100%",
-          height: "100%",
-
-          opacity,
-          backgroundColor: "#00111c",
-        }}
-      />
-    </div>
+    />
   );
 }
 

@@ -33,9 +33,9 @@ pip install deepity
 vcpkg install deepity
 
 # C++ Cross-platform
-git clone https://github.com/ra4ster/deepity.git && cd deepity && ./release.sh
-
-
+git clone https://github.com/ra4ster/deepity.git
+cd deepity
+python build.py
 `;
 
 function BuildCard() {
