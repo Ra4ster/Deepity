@@ -23,7 +23,7 @@ function HomePage() {
               <h1 className="text-white fw-bold hero-title">
                 Predictive Coding <br />
                 Networks.
-                <br className="d-block d-sm-none" />
+                <br className="d-block d-xl-none" />
                 <span className="magic-text"> Optimized.</span>
               </h1>
 

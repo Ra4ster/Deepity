@@ -15,6 +15,7 @@ import {
   Podium,
   Feather,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const NAV_GROUPS = [
   {
@@ -23,25 +24,25 @@ const NAV_GROUPS = [
       {
         icon: Download,
         label: "Installation",
-        href: "#installation",
+        href: "installation",
         number: 1,
       },
       {
         icon: Code2,
         label: "Your First PCN",
-        href: "#your-first-pcn",
+        href: "your-first-pcn",
         number: 2,
       },
       {
         icon: Layers2,
         label: "Training a PCN",
-        href: "#training-a-pcn",
+        href: "training-a-pcn",
         number: 3,
       },
       {
         icon: Zap,
         label: "Making Predictions",
-        href: "#making-predictions",
+        href: "making-predictions",
         number: 4,
       },
     ],
@@ -52,23 +53,23 @@ const NAV_GROUPS = [
       {
         icon: Brain,
         label: "Predictive Coding 101",
-        href: "#predictive-coding-101",
+        href: "predictive-coding-101",
       },
       {
         icon: Flame,
         label: "Energy Minimization",
-        href: "#energy-minimization",
+        href: "energy-minimization",
       },
       {
         icon: LayerArrowUp,
         label: "Layers & Connections",
-        href: "#layers-connections",
+        href: "layers-connections",
       },
       { icon: Activity, label: "Activations", href: "#activations" },
       {
         icon: SquaresUnite,
         label: "Batched Computation",
-        href: "#batched-computation",
+        href: "batched-computation",
       },
     ],
   },
@@ -78,27 +79,27 @@ const NAV_GROUPS = [
       {
         icon: SquareActivity,
         label: "Custom Activations",
-        href: "#custom-activations",
+        href: "custom-activations",
       },
       {
         icon: LifeBuoy,
         label: "Advanced Training",
-        href: "#advanced-training",
+        href: "advanced-training",
       },
       {
         icon: Podium,
         label: "Performance Tuning",
-        href: "#performance-tuning",
+        href: "performance-tuning",
       },
-      { icon: Feather, label: "Persistence & I/O", href: "#persistence-io" },
+      { icon: Feather, label: "Persistence & I/O", href: "persistence-io" },
     ],
   },
   {
     title: "Ecosystem",
     items: [
-      { label: "Python API", href: "#python-api" },
-      { label: "C++ API", href: "#cpp-api" },
-      { label: "Java", href: "#java-api", disabled: true, badge: "WIP" },
+      { label: "Python API", href: "python-api" },
+      { label: "C++ API", href: "cpp-api" },
+      { label: "Java", href: "java-api", disabled: true, badge: "WIP" },
     ],
   },
 ];
@@ -106,6 +107,7 @@ const NAV_GROUPS = [
 function NavLink({
   icon: Icon,
   label,
+  language,
   number,
   href,
   disabled,
@@ -116,28 +118,25 @@ function NavLink({
   const [isHovered, setIsHovered] = useState(false);
   const showHighlight = isActive || (isHovered && !disabled);
 
-  return (
-    <a
-      href={disabled ? undefined : href}
-      onClick={disabled ? (e) => e.preventDefault() : onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="d-flex align-items-center roboto text-decoration-none rounded"
-      style={{
-        fontSize: "0.85rem",
-        fontWeight: isActive ? 500 : 300,
-        padding: "6px 8px",
-        gap: 8,
-        color: disabled ? "#5a6473" : isActive ? "#ffffff" : "#c8ced8",
-        backgroundColor:
-          showHighlight && !disabled
-            ? "rgba(13, 110, 253, 0.15)"
-            : "transparent",
-        transition:
-          "background-color 0.15s ease-in-out, color 0.15s ease-in-out",
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-    >
+  const sharedProps = {
+    onMouseEnter: () => setIsHovered(true),
+    onMouseLeave: () => setIsHovered(false),
+    className: "d-flex align-items-center roboto text-decoration-none rounded",
+    style: {
+      fontSize: "0.85rem",
+      fontWeight: isActive ? 500 : 300,
+      padding: "6px 8px",
+      gap: 8,
+      color: disabled ? "#5a6473" : isActive ? "#ffffff" : "#c8ced8",
+      backgroundColor:
+        showHighlight && !disabled ? "rgba(13, 110, 253, 0.15)" : "transparent",
+      transition: "background-color 0.15s ease-in-out, color 0.15s ease-in-out",
+      cursor: disabled ? "not-allowed" : "pointer",
+    },
+  };
+
+  const content = (
+    <>
       {Icon && (
         <Icon
           size={15}
@@ -165,11 +164,32 @@ function NavLink({
           {badge}
         </span>
       )}
-    </a>
+    </>
+  );
+
+  // Disabled links shouldn't navigate at all — render a plain <span>
+  // rather than a Link, so there's no href/to for a screen reader or
+  // click to act on.
+  if (disabled) {
+    return (
+      <span
+        {...sharedProps}
+        aria-disabled="true"
+        style={{ ...sharedProps.style, pointerEvents: "none" }}
+      >
+        {content}
+      </span>
+    );
+  }
+
+  return (
+    <Link to={`${href}`} onClick={onClick} {...sharedProps}>
+      {content}
+    </Link>
   );
 }
 
-export default function TutorialNavCard() {
+export default function TutorialNavCard({ language = "python" }) {
   const [activeHref, setActiveHref] = useState("#overview");
 
   const handleClick = (href) => (e) => {
@@ -194,9 +214,10 @@ export default function TutorialNavCard() {
         <NavLink
           icon={House}
           label="Overview"
-          href="#overview"
-          isActive={activeHref === "#overview"}
-          onClick={handleClick("#overview")}
+          language={language}
+          href="/"
+          isActive={activeHref === "overview"}
+          onClick={handleClick("overview")}
         />
       </div>
 
@@ -219,6 +240,7 @@ export default function TutorialNavCard() {
                 key={item.href}
                 icon={item.icon}
                 label={item.label}
+                language={language}
                 number={item.number}
                 href={item.href}
                 disabled={item.disabled}

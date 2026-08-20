@@ -1,6 +1,8 @@
 import React, { useState } from "react";
-import { Check } from "lucide-react";
-import Footer1 from "./Footer1"; // Adjust path as needed
+import { Check, ClipboardCheck, Clipboard } from "lucide-react";
+import Footer1 from "../components/Footer1";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 export default function TutorialLayout({
   title,
@@ -169,16 +171,48 @@ export const TerminalBlock = ({ command }) => (
   </div>
 );
 
-export const CodeBlock = ({ code, language = "python" }) => (
-  <div className="bg-black border border-secondary rounded overflow-hidden my-4">
-    <div className="bg-dark text-secondary px-3 py-1 fs-7 font-monospace border-bottom border-secondary">
-      {language}
+export const CodeBlock = ({ code, language = "python" }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="bg-black border border-secondary rounded overflow-hidden my-4">
+      <div className="bg-dark text-secondary px-3 py-1 fs-7 font-monospace border-bottom border-secondary d-flex justify-content-between align-items-center">
+        <span>{language}</span>
+        <button
+          onClick={handleCopy}
+          className="btn btn-sm btn-outline-secondary d-flex align-items-center py-0 px-2"
+          style={{ fontSize: "0.75rem" }}
+        >
+          {copied ? (
+            <>
+              <ClipboardCheck size={13} className="me-1" /> Copied
+            </>
+          ) : (
+            <>
+              <Clipboard size={13} className="me-1" /> Copy
+            </>
+          )}
+        </button>
+      </div>
+      <SyntaxHighlighter
+        language={language}
+        style={oneDark}
+        customStyle={{
+          margin: 0,
+          padding: "0.75rem 1rem",
+          fontSize: "0.9rem",
+          background: "transparent",
+        }}
+        codeTagProps={{ style: { fontFamily: "inherit" } }}
+      >
+        {code}
+      </SyntaxHighlighter>
     </div>
-    <pre
-      className="p-3 mb-0 text-light font-monospace"
-      style={{ overflowX: "auto", fontSize: "0.9rem" }}
-    >
-      <code>{code}</code>
-    </pre>
-  </div>
-);
+  );
+};

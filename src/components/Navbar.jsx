@@ -1,3 +1,4 @@
+import { Link, useNavigate } from "react-router-dom";
 import Star from "../assets/star.svg";
 import { useState, useEffect, useRef } from "react";
 
@@ -5,6 +6,8 @@ function Navbar() {
   const [starCount, setStarCount] = useState(null);
   const navRef = useRef(null);
   const [navHeight, setNavHeight] = useState(0);
+  const [showLangModal, setShowLangModal] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch("https://api.github.com/repos/ra4ster/deepity")
@@ -41,6 +44,27 @@ function Navbar() {
     };
   }, []);
 
+  // Close the language modal on Escape.
+  useEffect(() => {
+    if (!showLangModal) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setShowLangModal(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showLangModal]);
+
+  const languages = [
+    { label: "C++", path: "/tutorials/cpp" },
+    { label: "Python", path: "/tutorials/python" },
+    { label: "Java", path: "/notfound" },
+  ];
+
+  const handleLanguageSelect = (path) => {
+    setShowLangModal(false);
+    navigate(path);
+  };
+
   return (
     <>
       <nav
@@ -54,9 +78,9 @@ function Navbar() {
         }}
       >
         {" "}
-        <a
+        <Link
           className="navbar-brand Inter fs-3 fw-semibold py-0 d-flex align-items-center"
-          href="/Deepity/"
+          to="/"
         >
           <img
             src="chicken-96.png"
@@ -69,12 +93,12 @@ function Navbar() {
             }}
           />
           Deepity
-        </a>
+        </Link>
         <button
           className="navbar-toggler"
           type="button"
-          data-toggle="collapse"
-          data-target="#navbarNavAltMarkup"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNavAltMarkup"
           aria-controls="navbarNavAltMarkup"
           aria-expanded="false"
           aria-label="Toggle navigation"
@@ -89,21 +113,31 @@ function Navbar() {
             <a className="nav-item nav-link" href="/Deepity/docs/index.html">
               Docs
             </a>
-            <a className="nav-item nav-link" href="/Deepity/tutorials">
+            <button
+              type="button"
+              className="nav-item nav-link p-0 border-0 bg-transparent"
+              style={{
+                fontWeight: 300,
+                fontSize: 15,
+                color: "rgba(255, 255, 255, 0.85)",
+                textDecoration: "none",
+              }}
+              onClick={() => setShowLangModal(true)}
+            >
               Tutorials
-            </a>
-            <a className="nav-item nav-link" href="#API">
+            </button>
+            <Link className="nav-item nav-link" to="#API">
               API
-            </a>
-            <a className="nav-item nav-link" href="#Benchmarks">
+            </Link>
+            <Link className="nav-item nav-link" to="#Benchmarks">
               Benchmarks
-            </a>
-            <a className="nav-item nav-link" href="#Examples">
+            </Link>
+            <Link className="nav-item nav-link" to="#Examples">
               Examples
-            </a>
-            <a className="nav-item nav-link" href="#Community">
+            </Link>
+            <Link className="nav-item nav-link" to="#Community">
               Community
-            </a>
+            </Link>
             <a
               className="nav-item nav-link"
               href="https://github.com/Ra4ster/Deepity"
@@ -130,8 +164,8 @@ function Navbar() {
             </a>
           </div>
           <a
-            href="https://github.com/ra4ster/deepity/stargazers"
-            className="btn btn-outline-light border-secondary my-2 my-sm-0 d-flex align-items-center text-decoration-none"
+            href="https://github.com/ra4ster/deepity"
+            className="btn btn-outline-light border-secondary my-2 my-sm-0 d-flex align-items-center text-center text-decoration-none"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -156,6 +190,90 @@ function Navbar() {
           navbar's real height, so page content doesn't start out hidden
           underneath it. */}
       <div style={{ height: navHeight }} aria-hidden="true" />
+
+      {/* Language-selection modal, shown before navigating to a tutorials
+          track. Styled to match the navbar's dark glass look. */}
+      {showLangModal && (
+        <div
+          onClick={() => setShowLangModal(false)}
+          role="presentation"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1050,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0, 8, 14, 0.6)",
+            backdropFilter: "blur(2px)",
+            WebkitBackdropFilter: "blur(2px)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tutorial-lang-modal-title"
+            className="Roboto"
+            style={{
+              backgroundColor: "rgba(0, 17, 28, 0.9)",
+              border: "1px solid #202d3b",
+              backdropFilter: "blur(14px) saturate(150%)",
+              WebkitBackdropFilter: "blur(14px) saturate(150%)",
+              borderRadius: 12,
+              padding: "28px 28px 24px",
+              width: "90%",
+              maxWidth: 380,
+              boxShadow: "0 10px 40px rgba(0, 0, 0, 0.5)",
+              color: "#fff",
+            }}
+          >
+            <div className="d-flex align-items-center justify-content-between mb-3">
+              <h5
+                id="tutorial-lang-modal-title"
+                className="Inter fw-semibold m-0"
+              >
+                Choose a language
+              </h5>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowLangModal(false)}
+                className="btn btn-sm text-light p-0 border-0 bg-transparent"
+                style={{
+                  fontSize: 20,
+                  lineHeight: 1,
+                  opacity: 0.7,
+                  textDecoration: "none",
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <p
+              className="Roboto mb-3"
+              style={{ fontWeight: 300, fontSize: 14, opacity: 0.8 }}
+            >
+              Pick which tutorials track you'd like to view.
+            </p>
+
+            <div className="d-flex flex-column gap-2">
+              {languages.map(({ label, path }) => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => handleLanguageSelect(path)}
+                  className="btn btn-outline-light border-secondary text-start"
+                  style={{ fontWeight: 300 }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

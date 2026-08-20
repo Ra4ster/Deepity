@@ -14,6 +14,7 @@ export default function FluidCard({
   color = "#0d6efd",
   width = 220,
   height = 120,
+  text = null,
 }) {
   return (
     <div
@@ -50,7 +51,7 @@ export default function FluidCard({
       <div
         className="position-absolute bottom-0 start-0 w-100"
         style={{
-          height: `${fillPercent}%`,
+          height: `${fillPercent + 10}%`,
           animation: "fluid-bob 3.6s ease-in-out infinite",
         }}
       >
@@ -134,6 +135,19 @@ export default function FluidCard({
           />
         ))}
       </div>
+      {text && (
+        <div
+          className="position-absolute mt-4 display-1 fw-bold inter top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          style={{
+            color: "#0d1420",
+            fontWeight: 600,
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        >
+          {text}
+        </div>
+      )}
     </div>
   );
 }

@@ -17,8 +17,9 @@ import FeaturedTutorial from "./components/FeaturedTutorial";
 import PreviewTutorial from "./components/PreviewTutorial";
 import TutorialNavCard from "./components/TutorialNavCard";
 import FluidCard from "./components/FluidCard";
+import { Link } from "react-router-dom";
 
-export default function TutorialPage() {
+export default function TutorialPage({ language = "python" }) {
   const menuItems = [
     "Featured Tutorial",
     "Getting Started",
@@ -66,7 +67,7 @@ export default function TutorialPage() {
           {/* Left Column — spans both rows so its height doesn't force row 1
               to stretch past the Center column's actual content height. */}
           <div style={{ gridColumn: "1", gridRow: "1 / 3" }}>
-            <TutorialNavCard />
+            <TutorialNavCard language={language} />
             <div className="card rounded border-secondary bg-dark bg-opacity-75 mt-4">
               <div className="card-body text-light">
                 <p className="roboto" style={{ fontWeight: 400, fontSize: 20 }}>
@@ -79,7 +80,12 @@ export default function TutorialPage() {
                   Join our community on Discord or open an issue on GitHub.
                 </span>
                 <div className="d-grid gap-2 mt-5">
-                  <a className="btn btn-outline-secondary text-light align-items-center">
+                  <a
+                    className="btn btn-outline-secondary text-light align-items-center"
+                    href="https://discord.gg/5vDvFDeSrV"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       width="16"
@@ -92,7 +98,12 @@ export default function TutorialPage() {
                     </svg>
                     Join Discord
                   </a>
-                  <a className="btn btn-outline-secondary text-light align-items-center">
+                  <a
+                    className="btn btn-outline-secondary text-light align-items-center"
+                    href="https://github.com/ra4ster/deepity/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <img src={GithubIcon} width="16" className="me-2" />
                     GitHub Issues
                   </a>
@@ -163,7 +174,7 @@ export default function TutorialPage() {
 
           {/* Right Column — same reasoning as Left: spans both rows so it
               doesn't force row 1 taller than Center actually needs. */}
-          <div style={{ gridColumn: "3", gridRow: "1 / 3" }}>
+          <div style={{ gridColumn: "3", gridRow: "1" }}>
             <div className="p-3 rounded mb-3 bg-dark bg-opacity-75 border border-secondary">
               <h6
                 className="text-white mb-2 ms-3"
@@ -189,9 +200,9 @@ export default function TutorialPage() {
                   {menuItems.map((item) => {
                     const isActive = activeItem === item;
                     return (
-                      <a
+                      <Link
                         key={item}
-                        href={`#${menuItemIds[item]}`}
+                        to={`/tutorials/${language}/${menuItemIds[item]}`}
                         onClick={() => setActiveItem(item)}
                         className="text-start px-3 bg-transparent text-white border-0 d-flex align-items-center roboto text-decoration-none"
                         style={{
@@ -202,7 +213,7 @@ export default function TutorialPage() {
                         }}
                       >
                         {item}
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
@@ -346,7 +357,12 @@ export default function TutorialPage() {
                   </a>
                 </div>
 
-                <FluidCard fillPercent={93} width={150} height={150} />
+                <FluidCard
+                  fillPercent={93}
+                  width="33%"
+                  height={150}
+                  text="93%"
+                />
               </div>
             </div>
           </div>
