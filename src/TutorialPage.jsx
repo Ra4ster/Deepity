@@ -143,13 +143,13 @@ export default function TutorialPage({ language = "python" }) {
               </Link>
             </div>
             <p
-              className="roboto text-light fw-semibold ms-3"
+              className="roboto text-light fw-semibold ms-3 mt-2"
               style={{ fontWeight: 300, fontSize: 30 }}
               id="FeaturedTutorial"
             >
               Featured Tutorial
             </p>
-            <FeaturedTutorial />
+            <FeaturedTutorial language={language} />
             <p
               className="roboto text-light fw-semibold ms-3 my-2"
               style={{ fontWeight: 300, fontSize: 25 }}

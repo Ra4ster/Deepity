@@ -24,7 +24,7 @@ export default function TutorialLayout({
           <div className="col-12 col-md-3 mb-3">
             <div className="sticky-top" style={{ top: "20px", zIndex: 10 }}>
               {/* 3. Inject the real nav card and pass the language down */}
-              <TutorialNavCard language={language} />
+              <TutorialNavCard className="fixed-top" language={language} />
             </div>
           </div>
 

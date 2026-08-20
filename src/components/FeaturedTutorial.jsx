@@ -1,6 +1,7 @@
 import TechBackground from "../assets/tech-bg.jpg";
+import { Link } from "react-router-dom";
 
-export default function FeaturedTutorial() {
+export default function FeaturedTutorial({ language = "python" }) {
   return (
     <div
       className="card border border-secondary rounded text-white position-relative overflow-hidden"
@@ -38,9 +39,9 @@ export default function FeaturedTutorial() {
             Python / C++
           </div>
         </div>
-        <button className="btn btn-primary mt-3 p-2 px-4">
+        <Link className="btn btn-primary mt-3 p-2 px-4" to={`/tutorials/${language}/your-first-pcn`}>
           Start Tutorial <span className="ms-2"> →</span>
-        </button>
+        </Link>
       </div>
     </div>
   );

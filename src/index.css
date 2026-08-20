@@ -12,14 +12,14 @@ code {
 
 @font-face {
   font-family: "AllianceNo1";
-  src: url("fonts/Degarism Studio - Alliance No.1 Light.otf");
+  src: url("/fonts/Degarism Studio - Alliance No.1 Light.otf");
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
   font-family: "AllianceNo2";
-  src: url("fonts/Degarism Studio - Alliance No.2 Light.otf");
+  src: url("/fonts/Degarism Studio - Alliance No.2 Light.otf");
   font-weight: normal;
   font-style: normal;
 }
