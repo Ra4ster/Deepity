@@ -12,6 +12,7 @@ export default function InstallationCpp() {
       title="Deepity C++ Integration"
       description="Compile the core Deepity engine from source and link it to your high-performance C++ applications."
       menuItems={menuItems}
+      language="cpp"
     >
       <h2 id="Prerequisites" className="mt-5 mb-3">
         Prerequisites

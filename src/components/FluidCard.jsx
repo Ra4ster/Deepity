@@ -107,13 +107,7 @@ export default function FluidCard({
             />
           </svg>
         </div>
-
-        {/* Solid fill below the waves so the bottom stays a flat block of color */}
-        <div
-          className="position-absolute bottom-0 start-0 w-100"
-          style={{ height: "70%", backgroundColor: color }}
-        />
-
+        
         {/* Rising bubbles */}
         {[
           { left: "15%", size: 6, delay: "0s", duration: "4.5s" },

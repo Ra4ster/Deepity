@@ -11,10 +11,12 @@
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
+    "katex": "^0.18.4",
     "lucide-react": "^1.31.0",
     "p5": "^2.3.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-katex": "^3.1.0",
     "react-router-dom": "^7.18.2",
     "react-syntax-highlighter": "^16.1.1",
     "vanta": "^0.5.24"

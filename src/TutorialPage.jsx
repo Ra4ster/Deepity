@@ -1,14 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Footer1 from "./components/Footer1";
 import {
   BicepsFlexed,
   Check,
-  CheckCircle2,
   ChevronRight,
-  Code,
   Code2,
   Download,
-  Upload,
   Zap,
 } from "lucide-react";
 import GithubIcon from "./assets/github.svg";
@@ -52,10 +49,6 @@ export default function TutorialPage({ language = "python" }) {
   return (
     <>
       <div className="container-fluid my-4">
-        {/* CSS Grid instead of Bootstrap row/col: one shared set of column
-            tracks (3fr / 7fr / 2fr, matching the original col-3/7/2 split)
-            means any item spanning columns 2–3 lines up exactly with the
-            center+right columns above it — no separate gutter math to drift. */}
         <div
           style={{
             display: "grid",
@@ -64,8 +57,7 @@ export default function TutorialPage({ language = "python" }) {
             rowGap: "1rem",
           }}
         >
-          {/* Left Column — spans both rows so its height doesn't force row 1
-              to stretch past the Center column's actual content height. */}
+          {/* Left Column */}
           <div style={{ gridColumn: "1", gridRow: "1 / 3" }}>
             <TutorialNavCard language={language} />
             <div className="card rounded border-secondary bg-dark bg-opacity-75 mt-4">
@@ -125,6 +117,31 @@ export default function TutorialPage({ language = "python" }) {
                 From your first network to advanced performance tuning.
               </p>
             </div>
+            <div className="px-3 my-1">
+              <Link
+                className={`btn btn-outline-light me-2 transition-all ${language === "cpp" ? "glow" : ""}`}
+                to="/tutorials/cpp"
+                onClick={() => alert("Switched to C++ Tutorials.")}
+              >
+                C++
+              </Link>
+
+              <Link
+                className={`btn btn-outline-light me-2 transition-all ${language === "python" ? "glow" : ""}`}
+                to="/tutorials/python"
+                onClick={() => alert("Switched to Python Tutorials.")}
+              >
+                Python
+              </Link>
+
+              <Link
+                /* NOTE: Kept "disabled" here, WIP */
+                className={`btn btn-outline-light me-2 transition-all ${language === "java" ? "glow" : "disabled"}`}
+                to="/tutorials/java"
+              >
+                Java <div className="badge bg-dark ms-1">WIP</div>
+              </Link>
+            </div>
             <p
               className="roboto text-light fw-semibold ms-3"
               style={{ fontWeight: 300, fontSize: 30 }}
@@ -158,8 +175,8 @@ export default function TutorialPage({ language = "python" }) {
               <PreviewTutorial
                 number={3}
                 icon={BicepsFlexed}
-                title="Your First PCN"
-                description="Define a network, compile it, and randomize weights."
+                title="Training"
+                description="Train on a simple dataset using energy minimization."
                 time={8}
               />
               <PreviewTutorial
@@ -172,8 +189,7 @@ export default function TutorialPage({ language = "python" }) {
             </div>
           </div>
 
-          {/* Right Column — same reasoning as Left: spans both rows so it
-              doesn't force row 1 taller than Center actually needs. */}
+          {/* Right Column */}
           <div style={{ gridColumn: "3", gridRow: "1" }}>
             <div className="p-3 rounded mb-3 bg-dark bg-opacity-75 border border-secondary">
               <h6
@@ -332,10 +348,7 @@ export default function TutorialPage({ language = "python" }) {
             </div>
           </div>
 
-          {/* Ready for real data — a single grid item spanning columns 2–3
-              (center + right). Since it shares the exact same column tracks
-              as the three items above, its left/right edges land exactly on
-              the center column's left edge and the right column's right edge. */}
+          {/* Ready for real data */}
           <div style={{ gridColumn: "2 / 4", gridRow: "2" }}>
             <div className="card bg-dark bg-opacity-75 border-secondary text-light p-3">
               <div className="d-flex justify-content-between align-items-center">

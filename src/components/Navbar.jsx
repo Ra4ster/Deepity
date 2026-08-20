@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import Star from "../assets/star.svg";
 import { useState, useEffect, useRef } from "react";
 
+import ChickenLogo from "/chicken-64.png";
+
 function Navbar() {
   const [starCount, setStarCount] = useState(null);
   const navRef = useRef(null);
@@ -83,7 +85,7 @@ function Navbar() {
           to="/"
         >
           <img
-            src="chicken-96.png"
+            src={ChickenLogo}
             width="32"
             height="32"
             className="d-inline-block align-top me-2 ms-3"
@@ -126,16 +128,16 @@ function Navbar() {
             >
               Tutorials
             </button>
-            <Link className="nav-item nav-link" to="#API">
+            <Link className="nav-item nav-link" to="/notfound">
               API
             </Link>
-            <Link className="nav-item nav-link" to="#Benchmarks">
+            <Link className="nav-item nav-link" to="/notfound">
               Benchmarks
             </Link>
-            <Link className="nav-item nav-link" to="#Examples">
+            <Link className="nav-item nav-link" to="/notfound">
               Examples
             </Link>
-            <Link className="nav-item nav-link" to="#Community">
+            <Link className="nav-item nav-link" to="/notfound">
               Community
             </Link>
             <a

@@ -41,7 +41,6 @@ function HomePage() {
                 >
                   <img
                     src={PythonLogo}
-                    width="20"
                     height="20"
                     alt="Python"
                     className="me-2"
@@ -53,13 +52,7 @@ function HomePage() {
                   className="btn border border-secondary text-white d-flex align-items-center justify-content-center p-2 touch-button"
                   style={{ transition: "none", cursor: "default" }}
                 >
-                  <img
-                    src={CppLogo}
-                    width="20"
-                    height="20"
-                    alt="C++"
-                    className="me-2"
-                  />
+                  <img src={CppLogo} height="20" alt="C++" className="me-2" />
                   C++
                 </button>
 
@@ -67,7 +60,7 @@ function HomePage() {
                   className="btn border border-secondary text-white d-flex align-items-center justify-content-center p-2 touch-button"
                   style={{ transition: "none", cursor: "default" }}
                 >
-                  <img src={JavaLogo} width="38" alt="Java" className="me-1" />
+                  <img src={JavaLogo} height="20" alt="Java" className="me-1" />
                   Java
                   <span className="ms-2 badge bg-black fw-light">WIP</span>
                 </button>

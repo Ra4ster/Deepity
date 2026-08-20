@@ -4,10 +4,13 @@ import Footer1 from "../components/Footer1";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
+import TutorialNavCard from "../components/TutorialNavCard";
+
 export default function TutorialLayout({
   title,
   description,
   menuItems,
+  language = "python", // 2. Add language prop (defaults to python)
   children,
 }) {
   const [activeItem, setActiveItem] = useState(menuItems[0]);
@@ -19,38 +22,13 @@ export default function TutorialLayout({
         <div className="row justify-content-center">
           {/* Left Navigation Column */}
           <div className="col-12 col-md-3 mb-3">
-            <div
-              className="p-3 border border-secondary rounded h-100 text-white bg-dark bg-opacity-75 sticky-top"
-              style={{ top: "20px", zIndex: 10 }}
-            >
-              <h6 className="fw-bold text-secondary mb-3 AllianceNo2">
-                TUTORIALS
-              </h6>
-              {/* Add your global tutorial navigation links here */}
-              <div className="d-flex flex-column gap-2 roboto fs-6">
-                <a
-                  href="/tutorials/getting-started"
-                  className="text-white text-decoration-none"
-                >
-                  Getting Started
-                </a>
-                <a
-                  href="/tutorials/pcns"
-                  className="text-secondary text-decoration-none"
-                >
-                  Understanding PCNs
-                </a>
-                <a
-                  href="/tutorials/mnist"
-                  className="text-secondary text-decoration-none"
-                >
-                  MNIST Benchmark
-                </a>
-              </div>
+            <div className="sticky-top" style={{ top: "20px", zIndex: 10 }}>
+              {/* 3. Inject the real nav card and pass the language down */}
+              <TutorialNavCard language={language} />
             </div>
           </div>
 
-          {/* Center Content Column (Where your specific page content goes) */}
+          {/* Center Content Column */}
           <div className="col-12 col-md-7 mb-3">
             <div className="p-3 mb-4">
               <h1 className="text-white fw-bold hero-title AllianceNo2">
@@ -61,7 +39,6 @@ export default function TutorialLayout({
               </p>
             </div>
 
-            {/* THIS IS WHERE THE MAGIC HAPPENS: Your page content is injected here */}
             <div
               className="text-light roboto px-3"
               style={{ fontWeight: 300, lineHeight: "1.7" }}

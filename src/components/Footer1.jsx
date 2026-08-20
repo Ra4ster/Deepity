@@ -1,3 +1,5 @@
+import ChickenLogo from "/chicken-64.png";
+
 function Footer1() {
   return (
     <footer
@@ -13,7 +15,7 @@ function Footer1() {
     >
       {/* Added mb-3 mb-md-0 for mobile spacing */}
       <img
-        src="chicken-64.png"
+        src={ChickenLogo}
         width="32"
         alt="Chicken"
         className="mx-3 mb-3 mb-md-0"

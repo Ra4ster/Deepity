@@ -8,6 +8,7 @@ export default function InstallationPython() {
       title="Installing pydeepity"
       description="Get the Python wrapper for Deepity up and running in your local environment."
       menuItems={menuItems}
+      language="python"
     >
       <h2 id="Requirements" className="mt-5 mb-3">
         Requirements

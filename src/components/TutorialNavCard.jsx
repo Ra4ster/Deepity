@@ -14,8 +14,9 @@ import {
   LifeBuoy,
   Podium,
   Feather,
+  ArrowLeft,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 const NAV_GROUPS = [
   {
@@ -54,22 +55,31 @@ const NAV_GROUPS = [
         icon: Brain,
         label: "Predictive Coding 101",
         href: "predictive-coding-101",
+        isGlobal: true, // Flagged to break out of /python/ or /cpp/
       },
       {
         icon: Flame,
         label: "Energy Minimization",
         href: "energy-minimization",
+        isGlobal: true,
       },
       {
         icon: LayerArrowUp,
         label: "Layers & Connections",
         href: "layers-connections",
+        isGlobal: true,
       },
-      { icon: Activity, label: "Activations", href: "#activations" },
+      {
+        icon: Activity,
+        label: "Activations",
+        href: "activations",
+        isGlobal: true,
+      },
       {
         icon: SquaresUnite,
         label: "Batched Computation",
         href: "batched-computation",
+        isGlobal: true,
       },
     ],
   },
@@ -91,15 +101,19 @@ const NAV_GROUPS = [
         label: "Performance Tuning",
         href: "performance-tuning",
       },
-      { icon: Feather, label: "Persistence & I/O", href: "persistence-io" },
+      {
+        icon: Feather,
+        label: "Persistence & I/O",
+        href: "persistence-io",
+      },
     ],
   },
   {
     title: "Ecosystem",
     items: [
-      { label: "Python API", href: "python-api" },
-      { label: "C++ API", href: "cpp-api" },
-      { label: "Java", href: "java-api", disabled: true, badge: "WIP" },
+      { label: "Python API", href: "/tutorials/python-api", isGlobal: true },
+      { label: "C++ API", href: "/tutorials/cpp-api", isGlobal: true },
+      { label: "Java", href: "#", disabled: true, badge: "WIP" },
     ],
   },
 ];
@@ -113,10 +127,18 @@ function NavLink({
   disabled,
   badge,
   isActive,
+  isGlobal, // Extract the new flag
   onClick,
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const showHighlight = isActive || (isHovered && !disabled);
+
+  // Construct an absolute path to prevent relative routing bugs
+  const targetPath = href.startsWith("/")
+    ? href
+    : isGlobal
+      ? `/tutorials/${href}`
+      : `/tutorials/${language}/${href}`;
 
   const sharedProps = {
     onMouseEnter: () => setIsHovered(true),
@@ -167,9 +189,6 @@ function NavLink({
     </>
   );
 
-  // Disabled links shouldn't navigate at all — render a plain <span>
-  // rather than a Link, so there's no href/to for a screen reader or
-  // click to act on.
   if (disabled) {
     return (
       <span
@@ -183,21 +202,50 @@ function NavLink({
   }
 
   return (
-    <Link to={`${href}`} onClick={onClick} {...sharedProps}>
+    <Link to={targetPath} onClick={onClick} {...sharedProps}>
       {content}
     </Link>
   );
 }
 
 export default function TutorialNavCard({ language = "python" }) {
-  const [activeHref, setActiveHref] = useState("#overview");
+  const [activeHref, setActiveHref] = useState("overview");
+  const location = useLocation();
+
+  const isHubPage =
+    location.pathname === `/tutorials/${language}` ||
+    location.pathname === `/tutorials/${language}/` ||
+    location.pathname === `/tutorials` ||
+    location.pathname === `/tutorials/`;
 
   const handleClick = (href) => (e) => {
     setActiveHref(href);
   };
 
+  const backTarget =
+    language === "core" ? "/tutorials" : `/tutorials/${language}`;
+  const backLabel =
+    language === "cpp"
+      ? "C++ Hub"
+      : language === "core"
+        ? "Tutorials Overview"
+        : "Python Hub";
+
   return (
     <div className="p-3 rounded mb-2 bg-dark bg-opacity-75 border border-secondary">
+      {!isHubPage && (
+        <Link
+          to={backTarget}
+          className="d-flex align-items-center text-secondary text-decoration-none mb-3 roboto"
+          style={{ fontSize: "0.85rem", transition: "color 0.2s" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "#ffffff")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "#6c757d")}
+        >
+          <ArrowLeft size={16} className="me-2" />
+          Back to {backLabel}
+        </Link>
+      )}
+
       <h6
         className="text-white mb-2 roboto"
         style={{
@@ -215,7 +263,8 @@ export default function TutorialNavCard({ language = "python" }) {
           icon={House}
           label="Overview"
           language={language}
-          href="/"
+          href="/tutorials"
+          isGlobal={true}
           isActive={activeHref === "overview"}
           onClick={handleClick("overview")}
         />
@@ -245,6 +294,7 @@ export default function TutorialNavCard({ language = "python" }) {
                 href={item.href}
                 disabled={item.disabled}
                 badge={item.badge}
+                isGlobal={item.isGlobal}
                 isActive={activeHref === item.href}
                 onClick={handleClick(item.href)}
               />

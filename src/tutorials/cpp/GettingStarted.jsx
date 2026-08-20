@@ -14,6 +14,7 @@ export default function GettingStartedCpp() {
       title="Getting Started (C++)"
       description="Integrate Deepity's core C++ engine directly into your high-performance applications for maximum control and speed."
       menuItems={menuItems}
+      language="cpp"
     >
       <h2 id="Integration" className="mt-5 mb-3">
         Integration

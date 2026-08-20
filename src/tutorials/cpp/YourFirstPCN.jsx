@@ -13,6 +13,7 @@ export default function YourFirstPCNCpp() {
       title="Your First PCN (C++)"
       description="Construct and train a Predictive Coding Network from scratch using the high-performance Deepity C++ backend."
       menuItems={menuItems}
+      language="cpp"
     >
       <h2 id="IncludesSetup" className="mt-5 mb-3">
         Includes & Setup

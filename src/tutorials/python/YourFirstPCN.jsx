@@ -13,6 +13,7 @@ export default function YourFirstPCNPython() {
       title="Your First PCN (Python)"
       description="Learn the fundamentals of pydeepity by training a Sequential PCN to solve the classic XOR problem."
       menuItems={menuItems}
+      language="python"
     >
       <h2 id="DataPreparation" className="mt-5 mb-3">
         Data Preparation

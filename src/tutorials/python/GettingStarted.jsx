@@ -13,6 +13,7 @@ export default function GettingStartedPython() {
       title="Getting Started"
       description="Install Deepity, build a Sequential Predictive Coding Network, and start training in minutes."
       menuItems={menuItems}
+      language="python"
     >
       <h2 id="Installation" className="mt-5 mb-3">
         Installation
