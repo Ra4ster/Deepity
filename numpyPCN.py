@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.typing as npt
+from numpy.typing import NDArray
 import os
 from time import perf_counter
 
