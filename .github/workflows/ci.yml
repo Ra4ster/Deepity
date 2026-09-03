@@ -51,8 +51,12 @@ jobs:
       - name: Install Python build dependencies
         run: python -m pip install nanobind rich
 
-      - name: Build and test (Release)
-        run: python build.py Release
+      - name: Build (Release)
+        # --no-tests: CMakeLists.txt no longer registers any CTest tests
+        # (the old test/benchmark executables were removed), so running
+        # ctest here would just fail on "no tests found" for no useful
+        # reason.
+        run: python build.py Release --no-tests
 
       - name: Upload build log
         if: always()
@@ -124,14 +128,6 @@ jobs:
 
       - name: Build
         run: cmake --build build/Release --config Release --parallel 2>&1 | Tee-Object -FilePath windows-build.log
-
-      - name: Run tests
-        run: |
-          $exe = Get-ChildItem -Path build/Release -Recurse -Filter "DeepityTests.exe" | Select-Object -First 1
-          if (-not $exe) {
-            throw "DeepityTests.exe not found under build/Release - check windows-build.log"
-          }
-          & $exe.FullName
 
       - name: Upload logs
         if: always()
