@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import os
 from time import perf_counter
 
@@ -61,12 +62,15 @@ class NumpyPCN:
         self.mb = [np.zeros_like(b) for b in self.b]
         self.vb = [np.zeros_like(b) for b in self.b]
         self.t = 0
-        
+    
+    
+    NDArrayF32 = npt.NDArray[np.float32] 
+
     def process(self, X, Y=None, steps=20, ir=0.04, lr=0.001, train=True):
         B = X.shape[0]
-        z = [None] * (self.L + 1)
-        mu = [None] * (self.L + 1)
-        e = [None] * (self.L + 1)
+        z = [NDArrayF32] * (self.L + 1)
+        mu = [NDArrayF32] * (self.L + 1)
+        e = [NDArrayF32] * (self.L + 1)
         
         # --- PROJECTION PASS ---
         z[0] = X
@@ -84,7 +88,7 @@ class NumpyPCN:
         
         # --- E-STEP (SETTLING) ---
         for step in range(steps):
-            dz = [None] * self.L
+            dz = [NDArrayF32] * self.L
             
             # 1. Update states (Linearized approximation: NO phi_prime!)
             for i in range(1, self.L):
