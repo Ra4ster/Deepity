@@ -357,6 +357,8 @@ set_target_properties(Deepity PROPERTIES
 # libomp.dll on its own, so DEEPITY_OMP_DLL (resolved earlier) is copied
 # alongside it explicitly. Centralized here instead of repeating both
 # copy steps for every executable below.
+set_property(GLOBAL PROPERTY JOB_POOLS deepity_dll_copy_pool=1)
+
 function(deepity_copy_runtime_dlls target)
     add_custom_command(TARGET ${target} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E $<IF:$<BOOL:$<TARGET_RUNTIME_DLLS:${target}>>,copy_if_different,true>
