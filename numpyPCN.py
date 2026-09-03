@@ -4,12 +4,18 @@ from numpy.typing import NDArray
 import os
 from time import perf_counter
 
+# Module-level so it's a plain, bare-name-resolvable reference wherever it's
+# used as a list placeholder below -- a class-body attribute isn't visible
+# as a bare name inside a method (only via self./ClassName.), which is why
+# this used to raise NameError the first time process() actually ran.
+NDArrayF32 = npt.NDArray[np.float32]
+
 def load_canonical_mnist():
     import gzip
     import urllib.request
     print("Fetching canonical MNIST dataset (idx-ubyte)...")
     base_url = "https://storage.googleapis.com/cvdf-datasets/mnist/"
-    files = {
+    files: dict[str, str] = {
         "x_train": "train-images-idx3-ubyte.gz",
         "y_train": "train-labels-idx1-ubyte.gz",
         "x_test": "t10k-images-idx3-ubyte.gz",
@@ -17,7 +23,7 @@ def load_canonical_mnist():
     }
     data_dir = "./data"
     os.makedirs(data_dir, exist_ok=True)
-    paths = {}
+    paths: dict[str, str] = {}
     for key, fname in files.items():
         filepath = os.path.join(data_dir, fname)
         paths[key] = filepath
@@ -63,9 +69,6 @@ class NumpyPCN:
         self.mb = [np.zeros_like(b) for b in self.b]
         self.vb = [np.zeros_like(b) for b in self.b]
         self.t = 0
-    
-    
-    NDArrayF32 = npt.NDArray[np.float32] 
 
     def process(self, X, Y=None, steps=20, ir=0.04, lr=0.001, train=True):
         B = X.shape[0]
