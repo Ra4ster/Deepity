@@ -72,9 +72,14 @@ class NumpyPCN:
 
     def process(self, X, Y=None, steps=20, ir=0.04, lr=0.001, train=True):
         B = X.shape[0]
-        z = [NDArrayF32] * (self.L + 1)
-        mu = [NDArrayF32] * (self.L + 1)
-        e = [NDArrayF32] * (self.L + 1)
+        # Real placeholder arrays, not the NDArrayF32 type object itself --
+        # every slot gets overwritten below before being read, but typing
+        # these as actual arrays (rather than putting the type alias into
+        # the list as a literal value) is what lets pyright track them as
+        # arrays through the rest of this method.
+        z: list[NDArrayF32] = [np.empty(0, dtype=np.float32) for _ in range(self.L + 1)]
+        mu: list[NDArrayF32] = [np.empty(0, dtype=np.float32) for _ in range(self.L + 1)]
+        e: list[NDArrayF32] = [np.empty(0, dtype=np.float32) for _ in range(self.L + 1)]
         
         # --- PROJECTION PASS ---
         z[0] = X
@@ -92,7 +97,7 @@ class NumpyPCN:
         
         # --- E-STEP (SETTLING) ---
         for step in range(steps):
-            dz = [NDArrayF32] * self.L
+            dz: list[NDArrayF32] = [np.empty(0, dtype=np.float32) for _ in range(self.L)]
             
             # 1. Update states (Linearized approximation: NO phi_prime!)
             for i in range(1, self.L):
