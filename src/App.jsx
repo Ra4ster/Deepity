@@ -24,7 +24,7 @@ export default function App() {
 
           <main>
             <Routes>
-              <Route path="/" element={<HomePage />} />
+              <Route path="" element={<HomePage />} />
               <Route path="/notfound" element={<NotFound />} />
             </Routes>
           </main>

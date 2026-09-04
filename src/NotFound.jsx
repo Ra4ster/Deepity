@@ -1,40 +1,49 @@
 import { Link } from "react-router-dom";
+import MainFooter from "./components/MainFooter";
 
 function NotFound() {
   return (
-    <div className="min-vh-100 bg position-relative d-flex align-items-center justify-content-center">
-      <div className="text-center px-3">
-        <h1
-          className="text-white fw-bold hero-title mb-3"
-          style={{ filter: "drop-shadow(0 4px 12px rgba(0, 0, 0, 0.8))" }}
-        >
-          Under <span className="magic-text">Construction</span>
-        </h1>
+    <div className="bg-[#e4e6e7] min-h-screen">
+      <div
+        className="min-h-screen flex flex-col items-center justify-center AllianceNo1 gap-4 text-center backdrop-blur-md pt-[80px]"
+        style={{
+          backgroundImage: `url(/flowerpot.jpg)`,
+          backgroundSize: "cover",
+          backgroundPosition: "center 65%",
+        }}
+      >
+        <span className="text-4xl AllianceNo1 text-black">
+          Under Construction
+        </span>
 
-        <p className="text-white Roboto fw-light fs-5 mb-4">
-          This page doesn't exist yet — or it's still being built.
-        </p>
+        <span className="text-lg AllianceNo1 text-black/70 mb-10 max-w-md">
+          This page is still being built.
+        </span>
 
         <Link
           to="/"
-          className="btn btn-primary d-inline-flex align-items-center justify-content-center touch-button"
+          className="group flex items-center gap-4 shadow-lg border border-black px-5 py-3 mt-3 text-base text-black font-bold no-underline transition-all duration-300 hover:bg-black hover:text-white hover:scale-105"
         >
-          Back to Home
           <svg
-            width="18"
-            height="18"
-            className="ms-2"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#ffffff"
-            strokeWidth="1.5"
+            stroke="currentColor"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
+            className="transition-transform duration-400 group-hover:rotate-90"
           >
-            <polyline points="9 18 15 12 9 6" />
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
           </svg>
+          Back to Home
+          <i className="fa fa-arrow-left"></i>
         </Link>
       </div>
+      <MainFooter />
     </div>
   );
 }
