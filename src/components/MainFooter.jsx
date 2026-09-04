@@ -8,7 +8,7 @@ export default function MainFooter() {
           <div>
             <div className="flex items-center gap-2">
               <img
-                src="/d-100-light.png"
+                src="./d-100-light.png"
                 alt="Deepity Logo"
                 className="h-10 w-auto"
               />

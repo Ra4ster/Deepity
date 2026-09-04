@@ -52,7 +52,7 @@ for (int epoch = 0; epoch < 1500; ++epoch)
 std::vector<float> predictions = net.Predict(X, 150);`;
 
 const heroStyle = {
-  backgroundImage: `url(/flowerpot.jpg)`,
+  backgroundImage: `url(./flowerpot.jpg)`,
   backgroundSize: "cover",
   backgroundPosition: "center 65%",
 };
