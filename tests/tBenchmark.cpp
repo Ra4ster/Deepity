@@ -42,7 +42,6 @@ namespace
             benchmark::ClobberMemory();
         }
 
-        // Track throughput (items per second) to easily spot the scaling crossover
         state.SetItemsProcessed(state.iterations() * batchSize);
     }
 

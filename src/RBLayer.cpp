@@ -33,7 +33,6 @@ RBLayer::~RBLayer()
     }
 }
 
-// --- MEMORY ORCHESTRATION ---
 size_t RBLayer::GetTotalSize() const noexcept
 {
     size_t total = 0;
@@ -84,10 +83,8 @@ void RBLayer::Attach(float *ptr) noexcept
         U[i] = dist(rng);
 }
 
-// CORE EXECUTION
 void RBLayer::RunPrediction(const float *input, size_t currentBatchSize) noexcept
 {
-    // FAST PATH: full batch, buffer empty
     if (currentBatchSize == batchSize && pendingCount == 0)
     {
         RunInferenceStep(input, nullptr, batchSize);

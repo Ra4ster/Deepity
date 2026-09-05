@@ -1,9 +1,3 @@
-// Targeted check: a MIDDLE layer's own weight gradient, with BOTH a real
-// layerBelow AND layerAbove -- the exact configuration the earlier Part 1
-// check never tested (it only used layerBelow=nullptr, matching an
-// input-layer situation, not a middle layer's). This is where the real
-// bug was found empirically: 17.67% sign agreement vs the working Jacobi
-// implementation on real MNIST data.
 #include <deepity/layers/GaussSeidelPCLayer.h>
 #include <random>
 #include <vector>
@@ -23,19 +17,17 @@ int main()
     GaussSeidelPCLayer layer0(4, 5, BATCH, LR, 0.1f, 0.0f, ActivationType::TANH, ActivationType::dTANH);
     GaussSeidelPCLayer layer1(5, 3, BATCH, LR, 0.1f, 0.0f, ActivationType::TANH, ActivationType::dTANH); // THE layer under test
     GaussSeidelPCLayer layer2(3, 0, BATCH, LR, 0.1f, 0.0f, ActivationType::LINEAR, ActivationType::dLINEAR);
-    layer0.SetLayerAbove(&layer1); layer1.SetLayerBelow(&layer0);
-    layer1.SetLayerAbove(&layer2); layer2.SetLayerBelow(&layer1);
+    layer0.SetLayerAbove(&layer1);
+    layer1.SetLayerBelow(&layer0);
+    layer1.SetLayerAbove(&layer2);
+    layer2.SetLayerBelow(&layer1);
 
     std::mt19937 rng(42);
     layer0.RandomizeWeights(rng);
     layer1.RandomizeWeights(rng);
     layer1.SetOptimizer(OptimizerType::ADAMW); // matches EXACTLY what the failing
-                                                 // real-data comparison used
+                                               // real-data comparison used
 
-    // Manual rebind -- GetRequiredFloats()/BindMemory() already ran during
-    // construction using the default SGD, before SetOptimizer() above.
-    // Without this, grad_W/m_W/v_W are still nullptr. Same fix needed for
-    // SimpleConvPCLayer earlier this session.
     static std::unique_ptr<MemoryArena> adamArena;
     adamArena = std::make_unique<MemoryArena>(layer1.GetRequiredFloats());
     layer1.BindMemory(*adamArena);
@@ -43,26 +35,40 @@ int main()
 
     std::uniform_real_distribution<float> dataDist(-1.0f, 1.0f);
     std::vector<float> x((size_t)BATCH * 4);
-    for (auto &v : x) v = dataDist(rng);
+    for (auto &v : x)
+        v = dataDist(rng);
     std::vector<float> target((size_t)BATCH * 3);
-    for (auto &v : target) v = dataDist(rng);
+    for (auto &v : target)
+        v = dataDist(rng);
 
-    layer0.ResetState(); layer1.ResetState(); layer2.ResetState();
+    layer0.ResetState();
+    layer1.ResetState();
+    layer2.ResetState();
     layer0.ClampState(x);
     layer2.ClampState(target);
     layer2.ComputeError(); // matches the corrected TrainStepWithProjection fix
 
-    auto step = [&]() {
-        layer0.UpdateState(); layer1.UpdateState(); layer2.UpdateState();
-        layer0.ComputePrediction(); layer1.ComputePrediction(); layer2.ComputePrediction();
-        layer0.ComputeError(); layer1.ComputeError(); layer2.ComputeError();
+    auto step = [&]()
+    {
+        layer0.UpdateState();
+        layer1.UpdateState();
+        layer2.UpdateState();
+        layer0.ComputePrediction();
+        layer1.ComputePrediction();
+        layer2.ComputePrediction();
+        layer0.ComputeError();
+        layer1.ComputeError();
+        layer2.ComputeError();
     };
 
-    for (int t = 0; t < 20; ++t) step();
+    for (int t = 0; t < 20; ++t)
+        step();
 
-    // Frozen-z energy -- ComputePrediction+ComputeError only.
-    auto totalEnergy = [&]() {
-        layer0.ComputePrediction(); layer1.ComputePrediction(); layer2.ComputePrediction();
+    auto totalEnergy = [&]()
+    {
+        layer0.ComputePrediction();
+        layer1.ComputePrediction();
+        layer2.ComputePrediction();
         float e0 = layer0.ComputeError();
         float e1 = layer1.ComputeError();
         float e2 = layer2.ComputeError();
@@ -108,12 +114,13 @@ int main()
         float best = std::min(err_descent, err_ascent);
         worstRelErr = std::max(worstRelErr, best);
         bool correctSign = err_descent < err_ascent;
-        if (correctSign) nCorrectSign++;
+        if (correctSign)
+            nCorrectSign++;
 
         std::cout << "  W[" << idx << "]: delta=" << analytic_delta[idx]
-                   << "  numeric_dE/dW=" << numeric_dEdW
-                   << "  " << (correctSign ? "MATCHES DESCENT" : "WRONG SIGN (matches ascent)")
-                   << "  rel_err=" << best << "\n";
+                  << "  numeric_dE/dW=" << numeric_dEdW
+                  << "  " << (correctSign ? "MATCHES DESCENT" : "WRONG SIGN (matches ascent)")
+                  << "  rel_err=" << best << "\n";
     }
     std::cout << "\nCorrect-sign fraction: " << (100.0f * nCorrectSign / nChecks) << "%\n";
     std::cout << "Worst relative error: " << worstRelErr << "\n";

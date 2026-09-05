@@ -42,14 +42,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # --- Profile-Guided Optimization (PGO) --------------------------------
-# Two-pass workflow driven by build.py, not something to invoke directly:
-# GENERATE builds an instrumented binary, a representative workload runs
-# against it to collect real branch/call-frequency data, then USE
-# rebuilds using that data. GCC/Clang only -- MSVC's PGO mechanism
-# (/GENPROFILE, a Visual-Studio-integrated flow) is different enough that
-# a single unified code path here isn't practical; MSVC falls back to a
-# plain, un-instrumented build with a warning instead of silently doing
-# something unexpected.
 set(DEEPITY_PGO_MODE "OFF" CACHE STRING "PGO mode: OFF, GENERATE, or USE")
 set_property(CACHE DEEPITY_PGO_MODE PROPERTY STRINGS OFF GENERATE USE)
 set(DEEPITY_PGO_DATA_DIR "${CMAKE_BINARY_DIR}/pgo-data" CACHE PATH "Directory for PGO profile data (shared by both GENERATE and USE passes)")
@@ -69,8 +61,6 @@ if(NOT DEEPITY_PGO_MODE STREQUAL "OFF")
         add_link_options(-fprofile-use=${DEEPITY_PGO_DATA_DIR})
         if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             # GCC-specific: tolerates minor profile/source mismatches
-            # gracefully instead of hard-failing. Clang doesn't need or
-            # recognize this flag.
             add_compile_options(-fprofile-correction)
         endif()
         message(STATUS "PGO: optimized (USE) build -- reading profile data from ${DEEPITY_PGO_DATA_DIR}")
@@ -78,12 +68,6 @@ if(NOT DEEPITY_PGO_MODE STREQUAL "OFF")
 endif()
 
 # --- Link-Time Optimization (LTO/IPO) --------------------------------
-# Uses CMake's portable INTERPROCEDURAL_OPTIMIZATION property rather than
-# a raw -flto flag: this correctly maps to -flto on GCC/Clang and
-# /GL+/LTCG on MSVC, and check_ipo_supported() lets this degrade
-# gracefully (a warning, not a hard build failure) on toolchains that
-# don't support it at all. Applied to Release builds only -- LTO
-# meaningfully slows compilation with no benefit for Debug builds.
 include(CheckIPOSupported)
 check_ipo_supported(RESULT DEEPITY_IPO_SUPPORTED OUTPUT DEEPITY_IPO_ERROR)
 if(NOT DEEPITY_IPO_SUPPORTED)
@@ -96,18 +80,7 @@ message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER}")
 
 find_package(OpenMP REQUIRED)
 
-# find_package(OpenMP) only learns the *import* library (via
-# OpenMP_omp_LIBRARY, set by build.py on the clang/Ninja Windows path) --
-# it has no idea where the runtime DLL lives, so $<TARGET_RUNTIME_DLLS:...>
-# further down can't discover or copy it (unlike OPENBLAS_DLL above, which
-# is resolved explicitly). Locate it here so it can be bundled the same way.
 if(WIN32 AND NOT DEEPITY_OMP_DLL)
-    # Don't key off OpenMP_omp_LIBRARY -- it's only populated when
-    # cmake_runner.py's CC=clang branch happened to fire. CMake can pick
-    # clang as the effective compiler even when that branch never ran
-    # (e.g. no MSVC dev shell active, clang just happens to be on PATH),
-    # so derive the LLVM install location from CMAKE_CXX_COMPILER itself,
-    # which is always correct regardless of how the compiler was chosen.
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER)
         get_filename_component(_clang_bin_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
         get_filename_component(_llvm_root "${_clang_bin_dir}" DIRECTORY)
@@ -118,17 +91,10 @@ if(WIN32 AND NOT DEEPITY_OMP_DLL)
         )
     endif()
     if(NOT DEEPITY_OMP_DLL AND OpenMP_omp_LIBRARY)
-        # Fall back to the old lookup in case it IS set (e.g. someone
-        # invokes cmake directly with -DOpenMP_omp_LIBRARY=...).
         get_filename_component(_omp_lib_dir "${OpenMP_omp_LIBRARY}" DIRECTORY)
         find_file(DEEPITY_OMP_DLL NAMES libomp.dll PATHS "${_omp_lib_dir}" "${_omp_lib_dir}/../bin")
     endif()
     if(NOT DEEPITY_OMP_DLL AND MSVC)
-        # MSVC's own OpenMP runtime ships with the VC redistributables --
-        # unless /openmp:llvm is in play (see target_compile_options
-        # below), in which case MSVC uses LLVM's runtime instead, typically
-        # named libomp140.x86_64.dll and shipped inside the VC toolset's
-        # own redist tree rather than a standalone LLVM install.
         find_file(DEEPITY_OMP_DLL NAMES vcomp140.dll vcomp140d.dll libomp140.x86_64.dll)
     endif()
     if(DEEPITY_OMP_DLL)
@@ -199,10 +165,6 @@ else()
     set(DEEPITY_BLAS_RESOLVED FALSE)
 
     if(DEEPITY_USE_MKL)
-        # Modern, recommended integration: Intel's own MKLConfig.cmake,
-        # present if oneAPI/MKL is properly installed and sourced (e.g.
-        # via `source /opt/intel/oneapi/setvars.sh`). Exposes a single
-        # target (MKL::MKL) with both include dirs and link libraries.
         find_package(MKL CONFIG QUIET)
         if(MKL_FOUND)
             message(STATUS "Using Intel MKL (found via MKLConfig.cmake).")

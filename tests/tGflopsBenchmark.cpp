@@ -1,22 +1,3 @@
-/**
- * @file tGflopsBenchmark.cpp
- * @brief Measures real, sustained GFLOPS for a full predictive-coding
- * train step, replacing the project's older, now-removed
- * LayerCPUMetrics.png benchmark (a stale 784-512-256-64-10 test whose
- * exact FLOP-counting methodology was never documented).
- *
- * FLOP accounting, made explicit here rather than assumed: for a layer
- * transitioning size -> nextSize with a given batchSize, each settling
- * step runs two GEMMs of matched cost (the forward prediction GEMM in
- * ComputeMuOnly(), and the feedback GEMM in UpdateState()), each costing
- * 2 * batchSize * size * nextSize FLOPs (the standard convention: one
- * multiply and one add per multiply-accumulate). UpdateWeights() runs a
- * third, equally-sized GEMM once per train step (not once per settling
- * step) for the weight gradient.
- *
- * Total FLOPs per train step, summed over all non-terminal layers:
- *   sum_over_layers[ batchSize * size * nextSize * (4 * numSteps + 2) ]
- */
 #include <benchmark/benchmark.h>
 #include <deepity/networks/SimplePCNetwork.h>
 #include <random>
@@ -26,8 +7,7 @@ static void BM_TrainStepGFLOPS(benchmark::State &state)
 {
     const int batchSize = 256;
     const int numSteps = 20;
-    // Matches the project's prior GFLOPS benchmark architecture, for a
-    // directly comparable before/after number.
+    // Matches the project's prior GFLOPS benchmark architecture
     const std::vector<int> layerSizes = {784, 512, 256, 64, 10};
 
     Deep::SimplePCNetwork net(batchSize);
@@ -52,7 +32,7 @@ static void BM_TrainStepGFLOPS(benchmark::State &state)
         Y[b * layerSizes.back() + (b % layerSizes.back())] = 0.999f;
 
     // Total FLOPs for one train step, summed over every non-terminal
-    // layer transition, per the accounting in the file header.
+    // layer transition
     double flopsPerStep = 0.0;
     for (size_t i = 0; i + 1 < layerSizes.size(); ++i)
     {

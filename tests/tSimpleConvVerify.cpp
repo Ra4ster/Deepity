@@ -1,15 +1,3 @@
-// Three-part verification of SimpleConvPCLayer, required before trusting
-// it for real training (per the file-level warning in
-// SimpleConvPCLayer.h):
-//   1. SGD weight-gradient check (finite-difference)
-//   2. Feedback-term (Col2Im) verification with a genuinely unclamped
-//      middle layer -- same methodology as tConvFeedbackVerify.cpp,
-//      re-run against THIS class specifically (precision removal touched
-//      the own-error term the feedback path depends on)
-//   3. AdamW weight-gradient check -- a NEW port, not the already-verified
-//      SimplePCLayer code, checking SIGN first (same bug class found and
-//      fixed there)
-
 #include "deepity/layers/SimpleConvPCLayer.h"
 #include <random>
 #include <vector>
@@ -214,14 +202,6 @@ void Part3_AdamWGradCheck()
     layerB.SetLayerBelow(&layerA);
     layerA.SetOptimizer(OptimizerType::ADAMW);
 
-    // REAL BUG, caught before running: the constructor already called
-    // BindMemory() with opt=SGD (the header default) BEFORE SetOptimizer()
-    // above ran -- grad_W/m_W/v_W are still nullptr at this point.
-    // SimpleConvPCNetwork (not yet built) would fix this the same way
-    // SimplePCNetwork does -- SetOptimizer() on every layer, THEN
-    // Compile() rebinds everything into a shared arena. For this
-    // standalone-layer test, do that rebind manually: a fresh, correctly-
-    // sized arena, now that GetRequiredFloats() sees opt=ADAMW.
     static std::unique_ptr<MemoryArena> adamArena; // static: must outlive layerA's use of it
     adamArena = std::make_unique<MemoryArena>(layerA.GetRequiredFloats());
     layerA.BindMemory(*adamArena);

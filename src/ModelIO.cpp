@@ -40,9 +40,6 @@ namespace Deep
             const auto &layers = net.GetLayers();
             uint64_t totalParameters = 0;
 
-            // -------------------------------------------------------------
-            // A. WRITE BINARY WEIGHTS (High-Speed Sequential Stream)
-            // -------------------------------------------------------------
             std::ofstream wStream(weightsPath, std::ios::binary);
             if (!wStream)
                 return false;
@@ -74,9 +71,6 @@ namespace Deep
             }
             wStream.close();
 
-            // -------------------------------------------------------------
-            // B. WRITE MANIFEST (JSON Metadata)
-            // -------------------------------------------------------------
             std::ofstream mStream(manifestPath);
             if (!mStream)
                 return false;
@@ -107,9 +101,6 @@ namespace Deep
             mStream << "}\n";
             mStream.close();
 
-            // -------------------------------------------------------------
-            // C. WRITE HUMAN-READABLE README.md
-            // -------------------------------------------------------------
             std::ofstream rStream(readmePath);
             if (!rStream)
                 return false;

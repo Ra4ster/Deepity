@@ -4,7 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <deepity/networks/DiscriminativePCNetwork.h>
-#include <deepity/utils/Profile.h> // Included for profiling output
+#include <deepity/utils/Profile.h>
 
 #define PCN_PROFILE
 
@@ -28,7 +28,6 @@ int main(void)
 
     for (int run = 0; run < NUM_RUNS; ++run)
     {
-        // Adjust class name if your network is DiscriminativePCNetwork vs PCNetwork
         DiscriminativePCNetwork net(BATCH_SIZE);
 
         net.AddLayer(784, 512, LEARNING_RATE, INFERENCE_RATE, PRECISION_RATE, LAMBDA, ActivationType::TANH, ActivationType::dTANH);
@@ -85,7 +84,6 @@ int main(void)
     std::cout << "> Note: This network will not converge, since it is random." << std::endl;
 
 #ifdef PCN_PROFILE
-    // Print profile breakdown upon completion
     Deep::PrintAllProfiles(totalTimeMs / 1000.0);
 #endif
 

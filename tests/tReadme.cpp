@@ -8,15 +8,11 @@
 
 using namespace Deep;
 
-// ============================================================================
-// 1. GFLOPS & END-TO-END BENCHMARK (784 -> 512 -> 256 -> 64 -> 10)
-// ============================================================================
 static void BM_Readme_GFLOPS_Network(benchmark::State &state)
 {
     const int batchSize = 256;
     DiscriminativePCNetwork net(batchSize);
 
-    // Architecture: 784 -> 512 -> 256 -> 64 -> 10
     net.AddLayer(784, 512, 0.05f, 0.3f, 0.0f, 0.0001f, Deep::tanh, Deep::dTanh);
     net.AddLayer(512, 256, 0.05f, 0.3f, 0.0f, 0.0001f, Deep::tanh, Deep::dTanh);
     net.AddLayer(256, 64, 0.05f, 0.3f, 0.0f, 0.0001f, Deep::tanh, Deep::dTanh);
@@ -39,9 +35,6 @@ static void BM_Readme_GFLOPS_Network(benchmark::State &state)
 }
 BENCHMARK(BM_Readme_GFLOPS_Network)->Unit(benchmark::kMillisecond);
 
-// ============================================================================
-// 2. PYTHON/NUMPY COMPARISON: 10,000 INPUTS THROUGHPUT
-// ============================================================================
 static void BM_Readme_10k_Throughput(benchmark::State &state)
 {
     const int batchSize = 256;
@@ -70,9 +63,6 @@ static void BM_Readme_10k_Throughput(benchmark::State &state)
 }
 BENCHMARK(BM_Readme_10k_Throughput)->Unit(benchmark::kMillisecond);
 
-// ============================================================================
-// 3. SIZE 128 WORKLOADS (GCC vs Clang Metrics)
-// ============================================================================
 static DiscriminativePCNetwork Create128Network()
 {
     DiscriminativePCNetwork net(1);
@@ -114,7 +104,6 @@ BENCHMARK(BM_Network_TrainSample_128);
 
 static void BM_Layer_UpdateWeights_128(benchmark::State &state)
 {
-    // Isolated layer for raw weight update speed
     DiscriminativePCLayer layer(128, 128, 1, 0.05f, 0.3f, 0.0f, 0.0001f, Deep::tanh, Deep::dTanh);
     std::mt19937 rng(42);
     layer.RandomizeWeights(rng);
@@ -127,9 +116,6 @@ static void BM_Layer_UpdateWeights_128(benchmark::State &state)
 }
 BENCHMARK(BM_Layer_UpdateWeights_128);
 
-// ============================================================================
-// 4. ACTIVATION FUNCTIONS (Naive vs Deepity SIMD + Sigmoids)
-// ============================================================================
 void naive_tanh(float *x, size_t n)
 {
     for (size_t i = 0; i < n; i++)
@@ -214,9 +200,6 @@ static void BM_Activation_DeepitySigmoid(benchmark::State &state)
 }
 BENCHMARK(BM_Activation_DeepitySigmoid)->Arg(10048)->Arg(1000064);
 
-// ============================================================================
-// 5. IMPACT OF BATCHING (1, 16, 64, 256, 512)
-// ============================================================================
 static void BM_ImpactOfBatching(benchmark::State &state)
 {
     int batchSize = state.range(0);

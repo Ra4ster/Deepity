@@ -1,9 +1,3 @@
-// Identical settling-loop logic to tProfile.cpp, but linked against
-// PLAIN Deepity -- NOT DeepityProfiled, NOT PCN_PROFILE. GEMM (2.1ms)
-// and tanh() (0.05ms) are both confirmed fast in isolation; if THIS is
-// also fast (~2-5ms/step), that conclusively proves PCN_PROFILE/
-// DeepityProfiled itself is the source of the ~106ms/step gap seen in
-// DeepityProfile -- not the actual computation.
 #include <iostream>
 #include <vector>
 #include <random>

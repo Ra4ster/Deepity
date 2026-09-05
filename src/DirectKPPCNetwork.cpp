@@ -98,12 +98,6 @@ namespace Deep
         for (int t = 0; t < inferenceSteps; t++)
             Step();
 
-        // Sync e/mu/zF to the TRUE final z before UpdateWeights() reads them.
-        // Step()'s own CalculateState() each iteration reflects z BEFORE that
-        // iteration's UpdateState() moves it, so after the loop exits, e/mu/zF
-        // are one iteration stale relative to the final z -- exactly the bug
-        // the test's added TotalEnergy() call worked around. This also gives a
-        // more accurate finalEnergy for free, computed at the true final state.
         float finalEnergy = 0.0f;
         for (auto &l : layers)
             finalEnergy += l->CalculateState();

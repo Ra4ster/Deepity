@@ -1,15 +1,3 @@
-// tConvGradCheck.cpp
-//
-// Finite-difference verification of ConvPCLayer::UpdateWeights() -- run
-// this AFTER the repack/single-GEMM restructure to confirm the math is
-// still exactly what it was, not just faster. Uses only public accessors
-// (GetWeights()), capturing W before/after a real UpdateWeights() call and
-// comparing that delta against numerically-estimated dE/dW.
-//
-// Network: layer0 (conv, 1x6x6 -> 2x4x4) directly feeding layer1 (terminal,
-// outChannels=0). BOTH layers clamped -- z never moves, isolating
-// UpdateWeights() with no settling/staleness complexity.
-
 #include <iostream>
 #include <vector>
 #include <random>
@@ -67,7 +55,7 @@ int main()
     std::vector<float> W_before(Wsize);
     std::memcpy(W_before.data(), layer0.GetWeights(), Wsize * sizeof(float));
 
-    layer0.UpdateWeights(); // <-- now internally does repack + single GEMM instead of 256 small ones
+    layer0.UpdateWeights();
 
     std::vector<float> W_after(Wsize);
     std::memcpy(W_after.data(), layer0.GetWeights(), Wsize * sizeof(float));

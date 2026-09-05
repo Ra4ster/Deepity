@@ -27,11 +27,7 @@ namespace Deep
 
     void SimpleConvPCNetwork::SetOptimizer(OptimizerType opt) noexcept
     {
-        // Deferred: just records the choice. Actually applied to every
-        // layer inside Compile(), BEFORE each layer's GetRequiredFloats()
-        // is summed -- GetRequiredFloats() itself depends on opt (Adam
-        // buffers only counted if opt is ADAM/ADAMW), so this must happen
-        // before the arena is sized, not after.
+        // Deferred: just records the choice.
         pendingOpt = opt;
     }
 

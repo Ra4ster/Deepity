@@ -1,22 +1,3 @@
-/**
- * @file tActivations.cpp
- * @brief Compares Deep::'s SIMD/SLEEF-backed activation functions
- * against naive std-library loops, across array sizes matching real
- * layer widths used elsewhere in this project (256 as a small hidden
- * layer, 512/784 matching the MNIST architecture, 16384/131072 as
- * larger, batch-scale sizes).
- *
- * Data is reset from a pristine copy before each timed call (a cheap
- * memcpy, excluded from the timed region via PauseTiming/ResumeTiming)
- * rather than reusing the same buffer repeatedly -- these functions
- * mutate their input in place, and tanh/sigmoid are contractions toward
- * a fixed point, so repeated application without a reset would
- * gradually change the value distribution across iterations and skew
- * later timings.
- *
- * Run with --benchmark_format=json to produce output matching this
- * project's existing benchmark-result convention (see logs/results.json).
- */
 #include <benchmark/benchmark.h>
 #include <deepity/utils/Activations.h>
 #include <vector>
@@ -36,8 +17,6 @@ namespace
         return data;
     }
 }
-
-// ─── tanh ────────────────────────────────────────────────────────────
 
 static void BM_Deep_Tanh(benchmark::State &state)
 {
@@ -78,8 +57,6 @@ static void BM_Std_Tanh(benchmark::State &state)
 }
 BENCHMARK(BM_Std_Tanh)->Arg(256)->Arg(512)->Arg(784)->Arg(16384)->Arg(131072);
 
-// ─── sigmoid ─────────────────────────────────────────────────────────
-
 static void BM_Deep_Sigmoid(benchmark::State &state)
 {
     size_t n = state.range(0);
@@ -118,8 +95,6 @@ static void BM_Std_Sigmoid(benchmark::State &state)
     state.SetItemsProcessed(state.iterations() * n);
 }
 BENCHMARK(BM_Std_Sigmoid)->Arg(256)->Arg(512)->Arg(784)->Arg(16384)->Arg(131072);
-
-// ─── relu ────────────────────────────────────────────────────────────
 
 static void BM_Deep_Relu(benchmark::State &state)
 {

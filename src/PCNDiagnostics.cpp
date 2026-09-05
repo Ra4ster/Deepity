@@ -561,9 +561,6 @@ namespace Deep
             net.RandomizeWeights(rng);
             net.Compile();
 
-            //----------------------------------------------------------
-            // Load image
-            //----------------------------------------------------------
             std::string img_path = "/home/rose0/Projects/deepity/resources/5.png";
             std::vector<float> x = LoadMNISTPNG(img_path);
 
@@ -573,16 +570,9 @@ namespace Deep
                 PrintResult("Overfit One MNIST", false);
                 return;
             }
-            //----------------------------------------------------------
-            // Target
-            //----------------------------------------------------------
 
             std::vector<float> y(OUTPUT, -0.9f);
             y[5] = 0.9f;
-
-            //----------------------------------------------------------
-            // Train ONLY this image
-            //----------------------------------------------------------
 
             constexpr int INFERENCE_STEPS = 15;
             constexpr int UPDATES = 1000;
@@ -630,10 +620,6 @@ namespace Deep
 
                 previousEnergy = energy;
             }
-
-            //----------------------------------------------------------
-            // Final evaluation
-            //----------------------------------------------------------
 
             auto pred = net.Predict(x, 50);
 

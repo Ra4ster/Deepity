@@ -152,11 +152,6 @@ namespace Deep
         }
     }
 
-    // ------------------------------------------------------------------
-    // Step 3: fresh error, using this layer's own (just-updated) z as
-    // the target and layerBelow's FRESH mu (from its ComputePrediction()
-    // call, earlier in this same timestep) as the prediction.
-    // ------------------------------------------------------------------
     float GaussSeidelPCLayer::ComputeError() noexcept
     {
         size_t ownStateSize = (size_t)batchSize * size;
@@ -270,12 +265,6 @@ namespace Deep
                 W[i] = dist(rng);
         }
 
-        // E: feedback-alignment matrix -- INDEPENDENT random draw (fresh
-        // seeds, matching ngc-learn's use of a separate subkey for E vs
-        // W), uniform +-0.3 (matching ngc-learn's ACTUAL StaticSynapse
-        // init convention exactly -- not the Gaussian/Xavier-style limit
-        // W uses above). Never touched again after this -- no evolve()
-        // call exists for it, matching "Static" in StaticSynapse.
         std::vector<uint32_t> eSeeds(omp_get_max_threads());
         for (auto &s : eSeeds)
             s = seedDist(twister);

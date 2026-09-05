@@ -1,16 +1,3 @@
-// Gradient check for GaussSeidelPCLayer -- necessitated by a real,
-// concrete failure signature in actual MNIST training: energy dropped
-// smoothly and genuinely low, but accuracy stayed at/below chance and
-// even declined -- the classic "found a degenerate solution satisfying
-// the energy objective without solving the task" signature, strongly
-// suggesting a real bug in the three-sweep math, not just a tuning issue.
-//
-// CRITICAL DESIGN POINT: totalEnergy() below calls ComputePrediction()
-// then ComputeError() on every layer -- deliberately NOT UpdateState(),
-// which would let z respond to a weight/z perturbation and corrupt the
-// check. This freezes z, matching the same "hold state fixed, perturb
-// one weight, re-measure energy" recipe used throughout this session's
-// other gradient checks.
 #include <deepity/layers/GaussSeidelPCLayer.h>
 #include <random>
 #include <vector>
@@ -46,7 +33,6 @@ void Part1_WeightGradCheck()
     layerA.ClampState(x);
     layerB.ClampState(target);
 
-    // Settle for real, using the genuine three-sweep Step() sequence.
     for (int t = 0; t < 30; ++t)
     {
         layerA.UpdateState();
@@ -57,9 +43,6 @@ void Part1_WeightGradCheck()
         layerB.ComputeError();
     }
 
-    // Frozen-z energy re-evaluation -- ComputePrediction+ComputeError
-    // ONLY, deliberately skipping UpdateState() so z doesn't respond to
-    // a weight perturbation.
     auto totalEnergy = [&]()
     {
         layerA.ComputePrediction();
