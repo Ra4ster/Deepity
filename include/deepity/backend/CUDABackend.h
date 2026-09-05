@@ -1,13 +1,14 @@
 #pragma once
 #include <deepity/backend/IComputeBackend.h>
+#include <cublas_v2.h>
 
 namespace Deep
 {
-    class CPUBackend : public IComputeBackend
+    class CUDABackend : public IComputeBackend
     {
     public:
-        CPUBackend() = default;
-        ~CPUBackend() override = default;
+        CUDABackend();
+        ~CUDABackend() override;
 
         float *Allocate(size_t numFloats) override;
         void Free(float *ptr) noexcept override;
@@ -38,5 +39,8 @@ namespace Deep
         void AdamWStep(float *param, const float *grad, float *m, float *v,
                        size_t n, int t, float lr, float weightDecay,
                        float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f) noexcept override;
+
+    private:
+        cublasHandle_t handle;
     };
 }
