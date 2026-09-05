@@ -5,6 +5,7 @@ import "./index.css";
 
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import TutorialLanding from "./TutorialLanding";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -25,6 +26,7 @@ export default function App() {
           <main>
             <Routes>
               <Route path="" element={<HomePage />} />
+              <Route path="/tutorial" element={<TutorialLanding />} />
               <Route path="/notfound" element={<NotFound />} />
             </Routes>
           </main>

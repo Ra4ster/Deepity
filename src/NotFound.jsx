@@ -7,7 +7,7 @@ function NotFound() {
       <div
         className="min-h-screen flex flex-col items-center justify-center AllianceNo1 gap-4 text-center backdrop-blur-md pt-[80px]"
         style={{
-          backgroundImage: `url(./flowerpot.jpg)`,
+          backgroundImage: `url(${import.meta.env.BASE_URL}flowerpot.webp)`,
           backgroundSize: "cover",
           backgroundPosition: "center 65%",
         }}

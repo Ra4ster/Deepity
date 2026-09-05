@@ -52,7 +52,7 @@ for (int epoch = 0; epoch < 1500; ++epoch)
 std::vector<float> predictions = net.Predict(X, 150);`;
 
 const heroStyle = {
-  backgroundImage: `url(./flowerpot.jpg)`,
+  backgroundImage: `url(${import.meta.env.BASE_URL}flowerpot.webp)`,
   backgroundSize: "cover",
   backgroundPosition: "center 65%",
 };
@@ -86,7 +86,7 @@ const CodeBlock = memo(({ language, code, icon, title }) => {
 
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 text-black/50 transition-colors hover:text-black"
+          className="flex items-center cursor-pointer gap-1.5 text-black/50 transition-colors hover:text-black"
           aria-label={`Copy ${title} code`}
         >
           <span className="text-xs">{copied ? "Copied!" : "Copy"}</span>
