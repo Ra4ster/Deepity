@@ -30,7 +30,7 @@ export default function MainFooter() {
                 GitHub
               </a>
               <Link
-                to="/docs"
+                to="/docs/index.html"
                 className="text-white/50 no-underline hover:text-white"
               >
                 Documentation

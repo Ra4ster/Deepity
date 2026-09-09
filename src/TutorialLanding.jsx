@@ -17,7 +17,7 @@ const tutorialsData = [
     description:
       "Explanation of what makes Deepity special and how to load/use it.",
     img: "./laptop.webp",
-    link: "1-beginning",
+    link: "/notfound",
   },
   {
     title: "2. Training a SimplePCN on XOR",
@@ -25,7 +25,7 @@ const tutorialsData = [
     description:
       "Get your first experience training the canonical PCN on a simple function.",
     img: "./ripple.webp",
-    link: "2-example",
+    link: "/notfound",
   },
   {
     title: "3. Adding Helpful Hyperparameters",
@@ -33,7 +33,7 @@ const tutorialsData = [
     description:
       "Now that you know how to use a SimplePCN, try converting to a SequentialPCN and tweaking parameters like precision and lambda.",
     img: "./dartboard.webp",
-    link: "3-hyperparameters",
+    link: "/notfound",
   },
   {
     title: "4. Running a Convolutional PCN",
@@ -41,7 +41,7 @@ const tutorialsData = [
     description:
       "Attempt to convolve the output over an image in 2D, capturing higher accuracy.",
     img: "./dimension.webp",
-    link: "4-convolutional",
+    link: "/notfound",
   },
   {
     title: "5. Direct Kolen-Pollack Networks on MNIST",
@@ -49,7 +49,7 @@ const tutorialsData = [
     description:
       "Research how propagating feedback can make convergence hyperfast.",
     img: "./wired.webp",
-    link: "5-dkppcn",
+    link: "/notfound",
   },
 ];
 

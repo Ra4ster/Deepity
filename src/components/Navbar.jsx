@@ -9,7 +9,7 @@ export default function Navbar() {
   const closeMenu = () => setIsOpen(false);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#202d3b] backdrop-blur-md">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#202d3b] backdrop-blur-md bg-white/50">
       <div className="h-20 flex items-center px-6 md:px-8">
         <Link
           to="/"

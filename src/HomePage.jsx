@@ -6,6 +6,7 @@ import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { lazy, Suspense, useState, memo } from "react";
 import MainFooter from "./components/MainFooter";
+import CodeBlock from "./components/CodeBlock";
 
 const BenchmarkChart = lazy(() => import("./components/BenchmarkChart"));
 const PCNRepresentation = lazy(() => import("./components/PCNRepresentation"));
@@ -65,75 +66,6 @@ const syntaxCustomStyle = {
   background: "#fafafa",
 };
 
-const CodeBlock = memo(({ language, code, icon, title }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => {
-      setCopied(false);
-    }, 1500);
-  };
-
-  return (
-    <div className="overflow-hidden border border-black/15">
-      <div className="flex items-center justify-between border-b border-black/15 bg-[#f1f2f3] px-4 py-2">
-        <div className="flex items-center gap-2">
-          <img src={icon} alt={title} className="h-4 w-4 object-contain" />
-          <span className="text-sm font-medium text-black/70">{title}</span>
-        </div>
-
-        <button
-          onClick={handleCopy}
-          className="flex items-center cursor-pointer gap-1.5 text-black/50 transition-colors hover:text-black"
-          aria-label={`Copy ${title} code`}
-        >
-          <span className="text-xs">{copied ? "Copied!" : "Copy"}</span>
-          {copied ? (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-          ) : (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect width="14" height="14" x="8" y="8" rx="2" />
-              <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-            </svg>
-          )}
-        </button>
-      </div>
-
-      <SyntaxHighlighter
-        language={language}
-        style={docco}
-        customStyle={syntaxCustomStyle}
-      >
-        {code}
-      </SyntaxHighlighter>
-    </div>
-  );
-});
-
 export default function HomePage() {
   return (
     <div className="bg-[#e4e6e7]">
@@ -146,13 +78,13 @@ export default function HomePage() {
           A high-performance implementation of
           <br /> Predictive Coding Networks in C++ and Python.
         </span>
-        <Link
-          to="/docs"
+        <a
+          href="#Explained"
           className="group flex items-center gap-4 shadow-lg border border-black px-5 py-3 mt-3 text-base text-black font-bold no-underline transition-colors duration-300 hover:bg-black hover:text-white hover:scale-105"
         >
           Get Started
           <Arrow />
-        </Link>
+        </a>
       </div>
 
       <section className="bg-[#e6e8e9] border-b border-[#202d3b]-200 px-8 py-20">
@@ -170,7 +102,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#e6e8e9] border-b border-[#202d3b]-200 px-8 py-20">
+      <section
+        className="bg-[#e6e8e9] border-b border-[#202d3b]-200 px-8 py-20"
+        id="Explained"
+      >
         <div className="mx-auto max-w-5xl justify-center align-items text-center">
           <h2 className="text-3xl AllianceNo1">What is Predictive Coding?</h2>
 
@@ -305,7 +240,7 @@ export default function HomePage() {
             height="350"
             allowtransparency="true"
             sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-            className="shrink-0 w-full md:w-[350px] shadow-xl"
+            className="shrink-0 w-full md:w-[350px] shadow-xl hover:shadow-2xl hover:scale-102 transition-all duration-300"
           />
         </div>
       </section>
