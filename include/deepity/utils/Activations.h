@@ -50,9 +50,12 @@ namespace Deep
     {
         RELU,
         dRELU,
+        GELU,
+        dGELU,
         SIGMOID,
         dSIGMOID,
         eSIGMOID,
+        d_eSIGMOID,
         TANH,
         dTANH,
         LINEAR,
@@ -61,18 +64,23 @@ namespace Deep
     };
 
     static inline void relu(float *, size_t) noexcept;
+    static inline void gelu(float *, size_t) noexcept;
     static inline void sigmoid(float *, size_t) noexcept;
     static inline void e_sigmoid(float *, size_t) noexcept;
     static inline void tanh(float *, size_t) noexcept;
     static inline void linear(float *, size_t) noexcept;
 
     static inline void dRelu(float *, size_t, bool) noexcept;
+    static inline void dGelu(float *, size_t, bool) noexcept;
     static inline void dSigmoid(float *, size_t, bool) noexcept;
+    static inline void d_eSigmoid(float *, size_t, bool) noexcept;
     static inline void dTanh(float *, size_t, bool) noexcept;
     static inline void dLinear(float *, size_t, bool) noexcept;
 
     static inline void dReluInto(float *RESTRICT, const float *RESTRICT, size_t) noexcept;
+    static inline void dGeluInto(float *RESTRICT, const float *RESTRICT, size_t) noexcept;
     static inline void dSigmoidInto(float *RESTRICT, const float *RESTRICT, size_t) noexcept;
+    static inline void d_eSigmoidInto(float *RESTRICT, const float *RESTRICT, size_t) noexcept;
     static inline void dTanhInto(float *RESTRICT, const float *RESTRICT, size_t) noexcept;
     static inline void dLinearInto(float *RESTRICT, const float *RESTRICT, size_t) noexcept;
 
@@ -82,6 +90,8 @@ namespace Deep
         {
         case ActivationType::RELU:
             return relu;
+        case ActivationType::GELU:
+            return gelu;
         case ActivationType::SIGMOID:
             return sigmoid;
         case ActivationType::eSIGMOID:
@@ -102,8 +112,12 @@ namespace Deep
         {
         case ActivationType::dRELU:
             return dRelu;
+        case ActivationType::dGELU:
+            return dGelu;
         case ActivationType::dSIGMOID:
             return dSigmoid;
+        case ActivationType::d_eSIGMOID:
+            return d_eSigmoid;
         case ActivationType::dTANH:
             return dTanh;
         case ActivationType::dLINEAR:
@@ -122,8 +136,12 @@ namespace Deep
         {
         case ActivationType::dRELU:
             return dReluInto;
+        case ActivationType::dGELU:
+            return dGeluInto;
         case ActivationType::dSIGMOID:
             return dSigmoidInto;
+        case ActivationType::d_eSIGMOID:
+            return d_eSigmoidInto;
         case ActivationType::dTANH:
             return dTanhInto;
         case ActivationType::dLINEAR:
@@ -138,6 +156,8 @@ namespace Deep
     {
         if (fn == relu)
             return ActivationType::RELU;
+        if (fn == gelu)
+            return ActivationType::GELU;
         if (fn == sigmoid)
             return ActivationType::SIGMOID;
         if (fn == e_sigmoid)
@@ -153,8 +173,12 @@ namespace Deep
     {
         if (dfn == dRelu)
             return ActivationType::dRELU;
+        if (dfn == dGelu)
+            return ActivationType::dGELU;
         if (dfn == dSigmoid)
             return ActivationType::dSIGMOID;
+        if (dfn == d_eSigmoid)
+            return ActivationType::d_eSIGMOID;
         if (dfn == dTanh)
             return ActivationType::dTANH;
         if (dfn == dLinear)
@@ -509,19 +533,319 @@ namespace Deep
     }
 #pragma endregion
 
-#define TANH_TINYLIMIT 0.000244140625f
-#define TANH_POLY_LIMIT 0.625f
-#define TANH_BIGLIMIT 6.0f
+#pragma region gelu
 
-#define P0 -0.9643991794f
-#define P1 -99.28772310f
-#define P2 -1614.687684f
+    constexpr float MAGIC_GELU_1 = 0.7978845608028654f;
+    constexpr float MAGIC_GELU_2 = 0.044715f;
 
-#define Q0 112.8116785f
-#define Q1 2235.488391f
-#define Q2 4844.063053f
+    static inline void gelu(float *RESTRICT x, const size_t n) noexcept
+    {
+        assert(n != 0 && "n must not be 0.");
+        assert(x != nullptr && "x must not be null.");
+
+        ptrdiff_t simd_end = 0;
+
+#if defined(__AVX512F__)
+        const __m512 ones512 = _mm512_set1_ps(1.0f);
+        const __m512 half512 = _mm512_set1_ps(0.5f);
+        const __m512 sqrt2overpi512 = _mm512_set1_ps(MAGIC_GELU_1);               // C1 = sqrt(2/pi)
+        const __m512 gelu_coeff512 = _mm512_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1); // C2 = C1 * 0.044715
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)15;
+        for (ptrdiff_t i = 0; i < simd_end; i += 16)
+        {
+            __m512 x512 = _mm512_load_ps(x + i);
+            __m512 cube512 = _mm512_mul_ps(x512, _mm512_mul_ps(x512, x512));
+            __m512 c1x512 = _mm512_mul_ps(sqrt2overpi512, x512);               // C1*x
+            __m512 inner512 = _mm512_fmadd_ps(cube512, gelu_coeff512, c1x512); // x^3*C2 + C1*x
+            __m512 t512 = Sleef_tanhf16_u10(inner512);
+            __m512 res = _mm512_mul_ps(half512, _mm512_mul_ps(x512, _mm512_add_ps(t512, ones512)));
+            _mm512_store_ps(x + i, res);
+        }
+#elif defined(__AVX__)
+        const __m256 ones256 = _mm256_set1_ps(1.0f);
+        const __m256 half256 = _mm256_set1_ps(0.5f);
+        const __m256 sqrt2overpi256 = _mm256_set1_ps(MAGIC_GELU_1);               // C1 = sqrt(2/pi)
+        const __m256 gelu_coeff256 = _mm256_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1); // C2 = C1 * 0.044715
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)7;
+        for (ptrdiff_t i = 0; i < simd_end; i += 8)
+        {
+            __m256 x256 = _mm256_load_ps(x + i);
+            __m256 cube256 = _mm256_mul_ps(x256, _mm256_mul_ps(x256, x256));
+            __m256 c1x256 = _mm256_mul_ps(sqrt2overpi256, x256); // C1*x
+#if defined(__AVX2__)
+            __m256 inner256 = _mm256_fmadd_ps(cube256, gelu_coeff256, c1x256); // x^3*C2 + C1*x
+#else
+            __m256 inner256 = _mm256_add_ps(_mm256_mul_ps(cube256, gelu_coeff256), c1x256);
+#endif
+            __m256 t256 = Sleef_tanhf8_u10(inner256);
+            __m256 res = _mm256_mul_ps(half256, _mm256_mul_ps(x256, _mm256_add_ps(t256, ones256)));
+            _mm256_store_ps(x + i, res);
+        }
+#elif defined(__SSE__) || defined(_M_AMD64) || defined(_M_X64)
+        const __m128 ones128 = _mm_set1_ps(1.0f);
+        const __m128 half128 = _mm_set1_ps(0.5f);
+        const __m128 sqrt2overpi128 = _mm_set1_ps(MAGIC_GELU_1);               // C1 = sqrt(2/pi)
+        const __m128 gelu_coeff128 = _mm_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1); // C2 = C1 * 0.044715
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)3;
+        for (ptrdiff_t i = 0; i < simd_end; i += 4)
+        {
+            __m128 x128 = _mm_load_ps(x + i);
+            __m128 cube128 = _mm_mul_ps(x128, _mm_mul_ps(x128, x128));
+            __m128 c1x128 = _mm_mul_ps(sqrt2overpi128, x128); // C1*x
+#ifdef __FMA__
+            __m128 inner128 = _mm_fmadd_ps(cube128, gelu_coeff128, c1x128); // x^3*C2 + C1*x
+#else
+            __m128 inner128 = _mm_add_ps(c1x128, _mm_mul_ps(cube128, gelu_coeff128));
+#endif
+            __m128 t128 = Sleef_tanhf4_u10(inner128);
+            __m128 res = _mm_mul_ps(half128, _mm_mul_ps(x128, _mm_add_ps(t128, ones128)));
+            _mm_store_ps(x + i, res);
+        }
+#endif
+        for (ptrdiff_t i = simd_end; i < n; ++i)
+        {
+            float xi = x[i];
+            float inner = MAGIC_GELU_1 * xi + (MAGIC_GELU_2 * MAGIC_GELU_1) * xi * xi * xi;
+            x[i] = 0.5f * xi * (1.0f + Sleef_tanhf_u10(inner));
+        }
+    }
+    static inline void dGelu(float *RESTRICT x, const size_t n, const bool activated) noexcept
+    {
+        assert(n != 0 && "n must not be 0.");
+        assert(x != nullptr && "x must not be null.");
+
+        ptrdiff_t simd_end = 0;
+
+#if defined(__AVX512F__)
+        const __m512 ones512 = _mm512_set1_ps(1.0f);
+        const __m512 half512 = _mm512_set1_ps(0.5f);
+        const __m512 c1_512 = _mm512_set1_ps(MAGIC_GELU_1);                          // C1
+        const __m512 c2_512 = _mm512_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1);           // C2
+        const __m512 c2_x3_512 = _mm512_set1_ps(3.0f * MAGIC_GELU_2 * MAGIC_GELU_1); // 3 * C2
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)15;
+        for (ptrdiff_t i = 0; i < simd_end; i += 16)
+        {
+            __m512 x512 = _mm512_load_ps(x + i);
+            __m512 xsq512 = _mm512_mul_ps(x512, x512);
+            __m512 xcube512 = _mm512_mul_ps(xsq512, x512);
+            __m512 c1x512 = _mm512_mul_ps(c1_512, x512);
+            __m512 inner512 = _mm512_fmadd_ps(xcube512, c2_512, c1x512);
+
+            __m512 t512 = Sleef_tanhf16_u10(inner512);
+            __m512 tsq512 = _mm512_mul_ps(t512, t512);
+
+            __m512 one_minus_tsq512 = _mm512_sub_ps(ones512, tsq512);
+            __m512 gprime512 = _mm512_fmadd_ps(xsq512, c2_x3_512, c1_512);
+
+            __m512 term1 = _mm512_mul_ps(half512, _mm512_add_ps(ones512, t512));
+            __m512 term2 = _mm512_mul_ps(half512, _mm512_mul_ps(x512, _mm512_mul_ps(gprime512, one_minus_tsq512)));
+            __m512 res = _mm512_add_ps(term1, term2);
+            _mm512_store_ps(x + i, res);
+        }
+#elif defined(__AVX__)
+        const __m256 ones256 = _mm256_set1_ps(1.0f);
+        const __m256 half256 = _mm256_set1_ps(0.5f);
+        const __m256 c1_256 = _mm256_set1_ps(MAGIC_GELU_1);
+        const __m256 c2_256 = _mm256_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1);
+        const __m256 c2_x3_256 = _mm256_set1_ps(3.0f * MAGIC_GELU_2 * MAGIC_GELU_1);
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)7;
+        for (ptrdiff_t i = 0; i < simd_end; i += 8)
+        {
+            __m256 x256 = _mm256_load_ps(x + i);
+            __m256 xsq256 = _mm256_mul_ps(x256, x256);
+            __m256 xcube256 = _mm256_mul_ps(xsq256, x256);
+            __m256 c1x256 = _mm256_mul_ps(c1_256, x256);
+
+#if defined(__AVX2__)
+            __m256 inner256 = _mm256_fmadd_ps(xcube256, c2_256, c1x256);
+            __m256 gprime256 = _mm256_fmadd_ps(xsq256, c2_x3_256, c1_256);
+#else
+            __m256 inner256 = _mm256_add_ps(_mm256_mul_ps(xcube256, c2_256), c1x256);
+            __m256 gprime256 = _mm256_add_ps(_mm256_mul_ps(xsq256, c2_x3_256), c1_256);
+#endif
+
+            __m256 t256 = Sleef_tanhf8_u10(inner256);
+            __m256 tsq256 = _mm256_mul_ps(t256, t256);
+            __m256 one_minus_tsq256 = _mm256_sub_ps(ones256, tsq256);
+
+            __m256 term1 = _mm256_mul_ps(half256, _mm256_add_ps(ones256, t256));
+            __m256 term2 = _mm256_mul_ps(half256, _mm256_mul_ps(x256, _mm256_mul_ps(gprime256, one_minus_tsq256)));
+
+            _mm256_store_ps(x + i, _mm256_add_ps(term1, term2));
+        }
+#elif defined(__SSE__) || defined(_M_AMD64) || defined(_M_X64)
+        const __m128 ones128 = _mm_set1_ps(1.0f);
+        const __m128 half128 = _mm_set1_ps(0.5f);
+        const __m128 c1_128 = _mm_set1_ps(MAGIC_GELU_1);
+        const __m128 c2_128 = _mm_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1);
+        const __m128 c2_x3_128 = _mm_set1_ps(3.0f * MAGIC_GELU_2 * MAGIC_GELU_1);
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)3;
+        for (ptrdiff_t i = 0; i < simd_end; i += 4)
+        {
+            __m128 x128 = _mm_load_ps(x + i);
+            __m128 xsq128 = _mm_mul_ps(x128, x128);
+            __m128 xcube128 = _mm_mul_ps(xsq128, x128);
+            __m128 c1x128 = _mm_mul_ps(c1_128, x128);
+
+#ifdef __FMA__
+            __m128 inner128 = _mm_fmadd_ps(xcube128, c2_128, c1x128);
+            __m128 gprime128 = _mm_fmadd_ps(xsq128, c2_x3_128, c1_128);
+#else
+            __m128 inner128 = _mm_add_ps(_mm_mul_ps(xcube128, c2_128), c1x128);
+            __m128 gprime128 = _mm_add_ps(_mm_mul_ps(xsq128, c2_x3_128), c1_128);
+#endif
+
+            __m128 t128 = Sleef_tanhf4_u10(inner128);
+            __m128 tsq128 = _mm_mul_ps(t128, t128);
+            __m128 one_minus_tsq128 = _mm_sub_ps(ones128, tsq128);
+
+            __m128 term1 = _mm_mul_ps(half128, _mm_add_ps(ones128, t128));
+            __m128 term2 = _mm_mul_ps(half128, _mm_mul_ps(x128, _mm_mul_ps(gprime128, one_minus_tsq128)));
+
+            _mm_store_ps(x + i, _mm_add_ps(term1, term2));
+        }
+#endif
+        for (ptrdiff_t i = simd_end; i < n; ++i)
+        {
+            float xi = x[i];
+            float xsq = xi * xi;
+
+            float inner = MAGIC_GELU_1 * xi + (MAGIC_GELU_2 * MAGIC_GELU_1) * xsq * xi;
+            float t = Sleef_tanhf_u10(inner);
+
+            float gprime = MAGIC_GELU_1 + (3.0f * MAGIC_GELU_2 * MAGIC_GELU_1) * xsq;
+
+            float term1 = 0.5f * (1.0f + t);
+            float term2 = 0.5f * xi * gprime * (1.0f - t * t);
+
+            x[i] = term1 + term2;
+        }
+    }
+
+    static inline void dGeluInto(float *RESTRICT dst, const float *RESTRICT src, const size_t n)
+    {
+
+        ptrdiff_t simd_end = 0;
+
+#if defined(__AVX512F__)
+        const __m512 ones512 = _mm512_set1_ps(1.0f);
+        const __m512 half512 = _mm512_set1_ps(0.5f);
+        const __m512 c1_512 = _mm512_set1_ps(MAGIC_GELU_1);                          // C1
+        const __m512 c2_512 = _mm512_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1);           // C2
+        const __m512 c2_x3_512 = _mm512_set1_ps(3.0f * MAGIC_GELU_2 * MAGIC_GELU_1); // 3 * C2
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)15;
+        for (ptrdiff_t i = 0; i < simd_end; i += 16)
+        {
+            __m512 x512 = _mm512_load_ps(src + i);
+            __m512 xsq512 = _mm512_mul_ps(x512, x512);
+            __m512 xcube512 = _mm512_mul_ps(xsq512, x512);
+            __m512 c1x512 = _mm512_mul_ps(c1_512, x512);
+            __m512 inner512 = _mm512_fmadd_ps(xcube512, c2_512, c1x512);
+
+            __m512 t512 = Sleef_tanhf16_u10(inner512);
+            __m512 tsq512 = _mm512_mul_ps(t512, t512);
+
+            __m512 one_minus_tsq512 = _mm512_sub_ps(ones512, tsq512);
+            __m512 gprime512 = _mm512_fmadd_ps(xsq512, c2_x3_512, c1_512);
+
+            __m512 term1 = _mm512_mul_ps(half512, _mm512_add_ps(ones512, t512));
+            __m512 term2 = _mm512_mul_ps(half512, _mm512_mul_ps(x512, _mm512_mul_ps(gprime512, one_minus_tsq512)));
+            __m512 res = _mm512_add_ps(term1, term2);
+            _mm512_store_ps(dst + i, res);
+        }
+#elif defined(__AVX__)
+        const __m256 ones256 = _mm256_set1_ps(1.0f);
+        const __m256 half256 = _mm256_set1_ps(0.5f);
+        const __m256 c1_256 = _mm256_set1_ps(MAGIC_GELU_1);
+        const __m256 c2_256 = _mm256_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1);
+        const __m256 c2_x3_256 = _mm256_set1_ps(3.0f * MAGIC_GELU_2 * MAGIC_GELU_1);
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)7;
+        for (ptrdiff_t i = 0; i < simd_end; i += 8)
+        {
+            __m256 x256 = _mm256_load_ps(src + i);
+            __m256 xsq256 = _mm256_mul_ps(x256, x256);
+            __m256 xcube256 = _mm256_mul_ps(xsq256, x256);
+            __m256 c1x256 = _mm256_mul_ps(c1_256, x256);
+
+#if defined(__AVX2__)
+            __m256 inner256 = _mm256_fmadd_ps(xcube256, c2_256, c1x256);
+            __m256 gprime256 = _mm256_fmadd_ps(xsq256, c2_x3_256, c1_256);
+#else
+            __m256 inner256 = _mm256_add_ps(_mm256_mul_ps(xcube256, c2_256), c1x256);
+            __m256 gprime256 = _mm256_add_ps(_mm256_mul_ps(xsq256, c2_x3_256), c1_256);
+#endif
+
+            __m256 t256 = Sleef_tanhf8_u10(inner256);
+            __m256 tsq256 = _mm256_mul_ps(t256, t256);
+            __m256 one_minus_tsq256 = _mm256_sub_ps(ones256, tsq256);
+
+            __m256 term1 = _mm256_mul_ps(half256, _mm256_add_ps(ones256, t256));
+            __m256 term2 = _mm256_mul_ps(half256, _mm256_mul_ps(x256, _mm256_mul_ps(gprime256, one_minus_tsq256)));
+
+            _mm256_store_ps(dst + i, _mm256_add_ps(term1, term2));
+        }
+#elif defined(__SSE__) || defined(_M_AMD64) || defined(_M_X64)
+        const __m128 ones128 = _mm_set1_ps(1.0f);
+        const __m128 half128 = _mm_set1_ps(0.5f);
+        const __m128 c1_128 = _mm_set1_ps(MAGIC_GELU_1);
+        const __m128 c2_128 = _mm_set1_ps(MAGIC_GELU_2 * MAGIC_GELU_1);
+        const __m128 c2_x3_128 = _mm_set1_ps(3.0f * MAGIC_GELU_2 * MAGIC_GELU_1);
+
+        simd_end = (ptrdiff_t)n & ~(ptrdiff_t)3;
+        for (ptrdiff_t i = 0; i < simd_end; i += 4)
+        {
+            __m128 x128 = _mm_load_ps(src + i);
+            __m128 xsq128 = _mm_mul_ps(x128, x128);
+            __m128 xcube128 = _mm_mul_ps(xsq128, x128);
+            __m128 c1x128 = _mm_mul_ps(c1_128, x128);
+
+#ifdef __FMA__
+            __m128 inner128 = _mm_fmadd_ps(xcube128, c2_128, c1x128);
+            __m128 gprime128 = _mm_fmadd_ps(xsq128, c2_x3_128, c1_128);
+#else
+            __m128 inner128 = _mm_add_ps(_mm_mul_ps(xcube128, c2_128), c1x128);
+            __m128 gprime128 = _mm_add_ps(_mm_mul_ps(xsq128, c2_x3_128), c1_128);
+#endif
+
+            __m128 t128 = Sleef_tanhf4_u10(inner128);
+            __m128 tsq128 = _mm_mul_ps(t128, t128);
+            __m128 one_minus_tsq128 = _mm_sub_ps(ones128, tsq128);
+
+            __m128 term1 = _mm_mul_ps(half128, _mm_add_ps(ones128, t128));
+            __m128 term2 = _mm_mul_ps(half128, _mm_mul_ps(x128, _mm_mul_ps(gprime128, one_minus_tsq128)));
+
+            _mm_store_ps(dst + i, _mm_add_ps(term1, term2));
+        }
+#endif
+        for (ptrdiff_t i = simd_end; i < n; ++i)
+        {
+            float xi = src[i];
+            float xsq = xi * xi;
+
+            float inner = MAGIC_GELU_1 * xi + (MAGIC_GELU_2 * MAGIC_GELU_1) * xsq * xi;
+            float t = Sleef_tanhf_u10(inner);
+
+            float gprime = MAGIC_GELU_1 + (3.0f * MAGIC_GELU_2 * MAGIC_GELU_1) * xsq;
+
+            float term1 = 0.5f * (1.0f + t);
+            float term2 = 0.5f * xi * gprime * (1.0f - t * t);
+
+            dst[i] = term1 + term2;
+        }
+    }
+
+#pragma endregion
 
 #pragma region tanh
+
     static inline void tanh(float *RESTRICT x, const size_t n) noexcept
     {
         assert(n != 0 && "n must not be 0.");
@@ -530,106 +854,279 @@ namespace Deep
         size_t simd_end = 0;
 
 #if defined(__AVX512F__)
-        simd_end = n - (n % 16);
-#pragma omp parallel for schedule(static) if (n > 65536 && !omp_in_parallel())
-        for (ptrdiff_t i = 0; i < (ptrdiff_t)(simd_end); i += 16)
+
+        simd_end = n & ~(size_t)15;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(simd_end); i += 16)
         {
-            __m512 x_512 = _mm512_loadu_ps(x + i);
-            __m512 res = Sleef_tanhf16_u10avx512f(x_512);
-            _mm512_storeu_ps(x + i, res);
+            __m512 v = _mm512_loadu_ps(x + i);
+            v = Sleef_tanhf16_u10avx512f(v);
+            _mm512_storeu_ps(x + i, v);
         }
 
 #elif defined(__AVX2__)
-        simd_end = n - (n % 8);
-#pragma omp parallel for schedule(static) if (n > 65536 && !omp_in_parallel())
-        for (ptrdiff_t i = 0; i < (ptrdiff_t)(simd_end); i += 8)
+
+        simd_end = n & ~(size_t)7;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(simd_end); i += 8)
         {
-            __m256 x_256 = _mm256_loadu_ps(x + i);
-            __m256 res = Sleef_tanhf8_u10avx2(x_256);
-            _mm256_storeu_ps(x + i, res);
+            __m256 v = _mm256_loadu_ps(x + i);
+            v = Sleef_tanhf8_u10avx2(v);
+            _mm256_storeu_ps(x + i, v);
+        }
+
+#elif defined(__AVX__)
+
+        simd_end = n & ~(size_t)7;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(simd_end); i += 8)
+        {
+            __m256 v = _mm256_loadu_ps(x + i);
+            v = Sleef_tanhf8_u10avx(v);
+            _mm256_storeu_ps(x + i, v);
         }
 
 #elif defined(__SSE4_1__) || defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
-        simd_end = n - (n % 4);
-#pragma omp parallel for schedule(static) if (n > 65536 && !omp_in_parallel())
-        for (ptrdiff_t i = 0; i < (ptrdiff_t)(simd_end); i += 4)
+
+        simd_end = n & ~(size_t)3;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(simd_end); i += 4)
         {
-            __m128 x_128 = _mm_loadu_ps(x + i);
+            __m128 v = _mm_loadu_ps(x + i);
+
 #if defined(__SSE4_1__)
-            __m128 res = Sleef_tanhf4_u10sse4(x_128);
+            v = Sleef_tanhf4_u10sse4(v);
 #else
-            __m128 res = Sleef_tanhf4_u10sse2(x_128);
-#endif
-            _mm_storeu_ps(x + i, res);
-        }
+            v = Sleef_tanhf4_u10sse2(v);
 #endif
 
-        for (size_t i = simd_end; i < n; i++)
+            _mm_storeu_ps(x + i, v);
+        }
+
+#endif
+
+        for (size_t i = simd_end; i < n; ++i)
         {
             x[i] = Sleef_tanhf_u10(x[i]);
         }
     }
-
-    static inline void dTanh(float *RESTRICT x, const size_t n, bool activated = false) noexcept
+    static inline void dTanh(float *RESTRICT x,
+                             const size_t n,
+                             const bool activated = false) noexcept
     {
         assert(n != 0 && "n must not be 0.");
         assert(x != nullptr && "x must not be null.");
 
-        if (!activated)
-            tanh(x, n);
-
         size_t i = 0;
-        [[maybe_unused]] size_t simd_end;
 
-#if defined(__AVX512F__)
-        __m512 ones = _mm512_set1_ps(1.0f);
-        simd_end = n - (n % 16);
-
-        for (; i < simd_end; i += 16)
+        if (activated)
         {
-            __m512 t = _mm512_loadu_ps(x + i);
+#if defined(__AVX512F__)
+
+            const __m512 ones = _mm512_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)15;
+
+            for (; i < simd_end; i += 16)
+            {
+                const __m512 t = _mm512_loadu_ps(x + i);
 
 #ifdef __FMA__
-            __m512 res = _mm512_fnmadd_ps(t, t, ones); // 1 - t*t
+                const __m512 res = _mm512_fnmadd_ps(t, t, ones);
 #else
-            __m512 res = _mm512_sub_ps(ones, _mm512_mul_ps(t, t));
+                const __m512 res = _mm512_sub_ps(
+                    ones,
+                    _mm512_mul_ps(t, t));
 #endif
-            _mm512_storeu_ps(x + i, res);
+
+                _mm512_storeu_ps(x + i, res);
+            }
+
+#elif defined(__AVX2__)
+
+            const __m256 ones = _mm256_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)7;
+
+            for (; i < simd_end; i += 8)
+            {
+                const __m256 t = _mm256_loadu_ps(x + i);
+
+#ifdef __FMA__
+                const __m256 res = _mm256_fnmadd_ps(t, t, ones);
+#else
+                const __m256 res = _mm256_sub_ps(
+                    ones,
+                    _mm256_mul_ps(t, t));
+#endif
+
+                _mm256_storeu_ps(x + i, res);
+            }
+
+#elif defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+
+            const __m128 ones = _mm_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)3;
+
+            for (; i < simd_end; i += 4)
+            {
+                const __m128 t = _mm_loadu_ps(x + i);
+
+#ifdef __FMA__
+                const __m128 res = _mm_fnmadd_ps(t, t, ones);
+#else
+                const __m128 res = _mm_sub_ps(
+                    ones,
+                    _mm_mul_ps(t, t));
+#endif
+
+                _mm_storeu_ps(x + i, res);
+            }
+
+#endif
+
+            for (; i < n; ++i)
+            {
+                const float t = x[i];
+                x[i] = 1.0f - t * t;
+            }
+
+            return;
+        }
+
+#if defined(__AVX512F__)
+
+        {
+            const __m512 ones = _mm512_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)15;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+            for (ptrdiff_t j = 0;
+                 j < static_cast<ptrdiff_t>(simd_end);
+                 j += 16)
+            {
+                __m512 t = _mm512_loadu_ps(x + j);
+                t = Sleef_tanhf16_u10avx512f(t);
+
+#ifdef __FMA__
+                t = _mm512_fnmadd_ps(t, t, ones);
+#else
+                t = _mm512_sub_ps(
+                    ones,
+                    _mm512_mul_ps(t, t));
+#endif
+
+                _mm512_storeu_ps(x + j, t);
+            }
+
+            i = simd_end;
         }
 
 #elif defined(__AVX2__)
-        __m256 ones = _mm256_set1_ps(1.0f);
-        simd_end = n - (n % 8);
 
-        for (; i < simd_end; i += 8)
         {
-            __m256 t = _mm256_loadu_ps(x + i);
-#ifdef __FMA__
-            __m256 res = _mm256_fnmadd_ps(t, t, ones); // 1 - t*t
-#else
-            __m256 res = _mm256_sub_ps(ones, _mm256_mul_ps(t, t));
-#endif
-            _mm256_storeu_ps(x + i, res);
-        }
-#elif defined(__SSE4_1__) || defined(_M_AMD64) || defined(_M_X64)
-        __m128 ones = _mm_set1_ps(1.0f);
-        simd_end = n - (n % 4);
+            const __m256 ones = _mm256_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)7;
 
-        for (; i < simd_end; i += 4)
-        {
-            __m128 t = _mm_loadu_ps(x + i);
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+            for (ptrdiff_t j = 0;
+                 j < static_cast<ptrdiff_t>(simd_end);
+                 j += 8)
+            {
+                __m256 t = _mm256_loadu_ps(x + j);
+                t = Sleef_tanhf8_u10avx2(t);
 
 #ifdef __FMA__
-            __m128 res = _mm_fnmadd_ps(t, t, ones); // 1 - t*t
+                t = _mm256_fnmadd_ps(t, t, ones);
 #else
-            __m128 res = _mm_sub_ps(ones, _mm_mul_ps(t, t));
-#endif
-            _mm_storeu_ps(x + i, res);
-        }
+                t = _mm256_sub_ps(
+                    ones,
+                    _mm256_mul_ps(t, t));
 #endif
 
+                _mm256_storeu_ps(x + j, t);
+            }
+
+            i = simd_end;
+        }
+
+#elif defined(__AVX__)
+
+        {
+            const __m256 ones = _mm256_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)7;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+            for (ptrdiff_t j = 0;
+                 j < static_cast<ptrdiff_t>(simd_end);
+                 j += 8)
+            {
+                __m256 t = _mm256_loadu_ps(x + j);
+                t = Sleef_tanhf8_u10avx(t);
+
+#ifdef __FMA__
+                t = _mm256_fnmadd_ps(t, t, ones);
+#else
+                t = _mm256_sub_ps(
+                    ones,
+                    _mm256_mul_ps(t, t));
+#endif
+
+                _mm256_storeu_ps(x + j, t);
+            }
+
+            i = simd_end;
+        }
+
+#elif defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+
+        {
+            const __m128 ones = _mm_set1_ps(1.0f);
+            const size_t simd_end = n & ~(size_t)3;
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+            for (ptrdiff_t j = 0;
+                 j < static_cast<ptrdiff_t>(simd_end);
+                 j += 4)
+            {
+                __m128 t = _mm_loadu_ps(x + j);
+
+#if defined(__SSE4_1__)
+                t = Sleef_tanhf4_u10sse4(t);
+#else
+                t = Sleef_tanhf4_u10sse2(t);
+#endif
+
+#ifdef __FMA__
+                t = _mm_fnmadd_ps(t, t, ones);
+#else
+                t = _mm_sub_ps(
+                    ones,
+                    _mm_mul_ps(t, t));
+#endif
+
+                _mm_storeu_ps(x + j, t);
+            }
+
+            i = simd_end;
+        }
+
+#else
+
+        i = 0;
+
+#endif
+
+        /*
+         * Scalar tail.
+         */
         for (; i < n; ++i)
-            x[i] = 1.0f - x[i] * x[i];
+        {
+            const float t = Sleef_tanhf_u10(x[i]);
+            x[i] = 1.0f - t * t;
+        }
     }
 
     /// @brief Two-buffer, single-pass tanh derivative: reads src, writes
@@ -978,13 +1475,192 @@ namespace Deep
             dst[i] = sig * (1.0f - sig);
         }
     }
+
+    static inline void d_eSigmoid(float *RESTRICT x,
+                                  const size_t n,
+                                  const bool activated = false) noexcept
+    {
+        assert(n != 0 && "n must not be 0.");
+        assert(x != nullptr && "x must not be null.");
+
+        if (!activated)
+            e_sigmoid(x, n);
+
+        size_t i = 0;
+
+#if defined(__AVX512F__)
+
+        const __m512 two = _mm512_set1_ps(2.0f);
+
+        const size_t r = n % 16;
+        const size_t simd_end = n - r;
+
+        for (; i < simd_end; i += 16)
+        {
+            const __m512 x_512 = _mm512_loadu_ps(x + i);
+
+            // d = 2 * x * (1 - x)
+            const __m512 d = _mm512_mul_ps(
+                _mm512_fnmadd_ps(x_512, x_512, x_512),
+                two);
+
+            _mm512_storeu_ps(x + i, d);
+        }
+
+#elif defined(__AVX2__)
+
+        const __m256 two = _mm256_set1_ps(2.0f);
+
+        const size_t r = n % 8;
+        const size_t simd_end = n - r;
+
+        for (; i < simd_end; i += 8)
+        {
+            const __m256 x_256 = _mm256_loadu_ps(x + i);
+
+#ifdef __FMA__
+            // x * (1 - x) = x - x^2
+            const __m256 d = _mm256_mul_ps(
+                _mm256_fnmadd_ps(x_256, x_256, x_256),
+                two);
+#else
+            const __m256 d = _mm256_mul_ps(
+                _mm256_sub_ps(x_256, _mm256_mul_ps(x_256, x_256)),
+                two);
+#endif
+
+            _mm256_storeu_ps(x + i, d);
+        }
+
+#elif defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+
+        const __m128 two = _mm_set1_ps(2.0f);
+
+        const size_t r = n % 4;
+        const size_t simd_end = n - r;
+
+        for (; i < simd_end; i += 4)
+        {
+            const __m128 x_128 = _mm_loadu_ps(x + i);
+
+#ifdef __FMA__
+            const __m128 d = _mm_mul_ps(
+                _mm_fnmadd_ps(x_128, x_128, x_128),
+                two);
+#else
+            const __m128 d = _mm_mul_ps(
+                _mm_sub_ps(x_128, _mm_mul_ps(x_128, x_128)),
+                two);
+#endif
+
+            _mm_storeu_ps(x + i, d);
+        }
+
+#endif
+
+        for (; i < n; ++i)
+        {
+            x[i] = 2.0f * x[i] * (1.0f - x[i]);
+        }
+    }
+
+    static inline void d_eSigmoidInto(float *RESTRICT dst,
+                                      const float *RESTRICT src,
+                                      const size_t n) noexcept
+    {
+        assert(n != 0 && "n must not be 0.");
+        assert(dst != nullptr && "dst must not be null.");
+        assert(src != nullptr && "src must not be null.");
+
+        size_t i = 0;
+
+#if defined(__AVX512F__)
+
+        const __m512 half = _mm512_set1_ps(0.5f);
+        const __m512 one = _mm512_set1_ps(1.0f);
+
+        const size_t simd_end = n - (n % 16);
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t j = 0; j < (ptrdiff_t)simd_end; j += 16)
+        {
+            const __m512 s = _mm512_loadu_ps(src + j);
+            const __m512 a = _mm512_add_ps(_mm512_abs_ps(s), one);
+            const __m512 d = _mm512_div_ps(half, _mm512_mul_ps(a, a));
+
+            _mm512_storeu_ps(dst + j, d);
+        }
+
+        i = simd_end;
+
+#elif defined(__AVX2__)
+
+        const __m256 half = _mm256_set1_ps(0.5f);
+        const __m256 one = _mm256_set1_ps(1.0f);
+        const __m256 abs_mask =
+            _mm256_castsi256_ps(_mm256_set1_epi32(0x7FFFFFFF));
+
+        const size_t simd_end = n - (n % 8);
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t j = 0; j < (ptrdiff_t)simd_end; j += 8)
+        {
+            const __m256 s = _mm256_loadu_ps(src + j);
+            const __m256 a = _mm256_add_ps(
+                _mm256_and_ps(s, abs_mask),
+                one);
+
+            const __m256 d = _mm256_div_ps(
+                half,
+                _mm256_mul_ps(a, a));
+
+            _mm256_storeu_ps(dst + j, d);
+        }
+
+        i = simd_end;
+
+#elif defined(__SSE2__) || defined(_M_AMD64) || defined(_M_X64)
+
+        const __m128 half = _mm_set1_ps(0.5f);
+        const __m128 one = _mm_set1_ps(1.0f);
+        const __m128 abs_mask =
+            _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF));
+
+        const size_t simd_end = n - (n % 4);
+
+#pragma omp parallel for schedule(static) if (n > 16384 && !omp_in_parallel())
+        for (ptrdiff_t j = 0; j < (ptrdiff_t)simd_end; j += 4)
+        {
+            const __m128 s = _mm_loadu_ps(src + j);
+            const __m128 a = _mm_add_ps(
+                _mm_and_ps(s, abs_mask),
+                one);
+
+            const __m128 d = _mm_div_ps(
+                half,
+                _mm_mul_ps(a, a));
+
+            _mm_storeu_ps(dst + j, d);
+        }
+
+        i = simd_end;
+
+#endif
+
+        for (; i < n; ++i)
+        {
+            const float a = 1.0f + std::fabs(src[i]);
+            dst[i] = 0.5f / (a * a);
+        }
+    }
+
 #pragma endregion
 
     static inline void linear([[maybe_unused]] float *x, [[maybe_unused]] size_t n) noexcept {}
 
     static inline void dLinear(float *x, size_t n, [[maybe_unused]] bool activated = false) noexcept
     {
-        std::fill_n(x, n, 1.0f);
+        std::fill(x, x + n, 1.0f);
     }
 
     /// @brief Two-buffer variant of dLinear -- src is unused (the
@@ -992,6 +1668,6 @@ namespace Deep
     /// signature consistency with To_dFn2's dispatch table.
     static inline void dLinearInto(float *RESTRICT dst, [[maybe_unused]] const float *RESTRICT src, size_t n) noexcept
     {
-        std::fill_n(dst, n, 1.0f);
+        std::fill(dst, dst + n, 1.0f);
     }
 }

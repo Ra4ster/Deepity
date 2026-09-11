@@ -1,19 +1,20 @@
 #pragma once
 #include <deepity/backend/IComputeBackend.h>
+#ifdef DEEPITY_USE_CUDA
+#include <cublas_v2.h>
+#endif
 #include <deepity/backend/Tensor.h>
 
 namespace Deep
 {
-    class CPUBackend : public IComputeBackend
+    class CUDABackend : public IComputeBackend
     {
     public:
-        CPUBackend() = default;
-        ~CPUBackend() override = default;
-
-        // @remark these are no-ops for backend purposes
-        void BeginGraphCapture() noexcept override {}
-        bool EndGraphCapture() noexcept override { return true; } // nothing to fail on CPU
-        void ReplayGraph() noexcept override {}
+        CUDABackend();
+        ~CUDABackend() override;
+        void BeginGraphCapture() noexcept override;
+        bool EndGraphCapture() noexcept override;
+        void ReplayGraph() noexcept override;
 
         float *Allocate(size_t numFloats) override;
         void Free(float *ptr) noexcept override;
@@ -24,17 +25,18 @@ namespace Deep
         void RandomizeNormal(float *buf, size_t n, float mean, float stddev, uint32_t seed) noexcept override;
         void RandomizeUniform(float *buf, size_t n, float min, float max, uint32_t seed) noexcept override;
 
+        void SumRows(float *dst, const float *src, size_t batchSize, size_t width) noexcept override;
+
         /// @brief Must be called once, before Compile()'s first
         /// BeginGraphCapture(), for any backend that needs to prepare
         /// batch-size-dependent state (e.g. CUDABackend's cached all-ones
         /// vector for SumRows' GEMV). No-op on CPUBackend.
-        void PrepareForBatchSize(size_t batchSize) noexcept override {}
+        void PrepareForBatchSize(size_t batchSize) noexcept override;
 
         void MatMul(bool transA, bool transB, int M, int N, int K,
                     float alpha, const float *A, int lda,
                     const float *B, int ldb,
                     float beta, float *C, int ldc) noexcept override;
-        void SumRows(float *dst, const float *src, size_t batchSize, size_t width) noexcept override;
 
         void Scale(float *buf, size_t n, float alpha) noexcept override;
         void AxpyInto(float *y, const float *x, size_t n, float alpha) noexcept override;
@@ -50,7 +52,7 @@ namespace Deep
         float ComputeErrorAndEnergy(float *e, const float *z, const float *mu, size_t n) noexcept override;
         void ComputeError(float *e, const float *z, const float *mu, size_t n) noexcept override;
 
-        void IncrementCounter(int *counter) noexcept override;
+        void IncrementCounter(int *ptr) noexcept override;
 
         void AdamStep(float *param, const float *grad, float *m, float *v,
                       size_t n, const int *t, const float *lr,
@@ -59,6 +61,15 @@ namespace Deep
                        size_t n, const int *t, const float *lr, float weightDecay,
                        float beta1 = 0.9f, float beta2 = 0.999f, float eps = 1e-8f) noexcept override;
 
-        DeviceType GetDeviceType() const noexcept override { return DeviceType::DEVICE_CPU; };
+        DeviceType GetDeviceType() const noexcept override { return DeviceType::DEVICE_GPU; }
+
+    private:
+        cublasHandle_t handle;
+        cudaStream_t stream;
+        cudaGraph_t graph = nullptr;
+        cudaGraphExec_t graphExec = nullptr;
+        bool hasGraph = false;
+        void *workspace = nullptr;
+        float *onesVector = nullptr;
     };
 }
