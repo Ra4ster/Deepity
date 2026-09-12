@@ -1,8 +1,8 @@
 import numpy as np
 import os
 import sys
-from pydeepity import DKPPCN
 from time import perf_counter
+from pydeepity import SimplePCN
 
 def load_full_mnist():
     import gzip
@@ -40,34 +40,38 @@ def load_full_mnist():
     return X_train, Y_train, X_test, y_test_labels
 
 def main() -> None:
-    SEED = int(sys.argv[1]) if len(sys.argv) > 1 else 7
-    EPOCHS = int(sys.argv[2]) if len(sys.argv) > 2 else 50
-    INFERENCE_STEPS = int(sys.argv[3]) if len(sys.argv) > 3 else 2
+    SEED = int(sys.argv[1]) if len(sys.argv) > 1 else 7 
+    EPOCHS = int(sys.argv[2]) if len(sys.argv) > 2 else 15
 
     X_train, Y_train, X_test, y_test_labels = load_full_mnist()
 
     BATCH_SIZE = 250
-    TERMINAL_SIZE = 10
+    STEPS = 30
     LR = 0.00373
-    IR = 0.15
-    FL = 1e-3
-    LMBDA = 1e-4  # The crucial Kolen-Pollack alignment decay
     DECAY_RATE = 0.94
+    LMBDA = 0.0  # Keep at 0.0! Weight decay breaks the PCN's symmetric feedback
 
     print(f"\nBuilding network (784->512->512->10), seed={SEED}...")
-    net = DKPPCN(batch_size=BATCH_SIZE, device="cpu")
-    net.add_layer(784, 512, TERMINAL_SIZE, lr=LR, ir=IR, fl=FL, lmbda=LMBDA, act="linear")
-#     net.add_layer(512, 512, TERMINAL_SIZE, lr=LR, ir=IR, fl=FL, lmbda=LMBDA, act="sigmoid")
-    net.add_layer(512, TERMINAL_SIZE, TERMINAL_SIZE, lr=LR, ir=IR, fl=FL, lmbda=LMBDA, act="sigmoid")
-    net.add_layer(TERMINAL_SIZE, 0, TERMINAL_SIZE, lr=LR, ir=IR, fl=FL, lmbda=LMBDA, act="linear")
-    net.set_optimizer("ADAM")
-    net.set_psi_optimizer("ADAM")
+    net = SimplePCN(batch_size=BATCH_SIZE, device="gpu")
+    
+    net.add_layer(784, 512, lr=LR, ir=0.091, act="linear", lmbda=LMBDA)
+    net.add_layer(512, 512, lr=LR, ir=0.091, act="sigmoid", lmbda=LMBDA)
+    net.add_layer(512, 10,  lr=LR, ir=0.091, act="sigmoid", lmbda=LMBDA)
+    net.add_layer(10, 0,    lr=LR, ir=0.091, act="linear", lmbda=LMBDA)
+    
+    # 1. Engage decoupled AdamW
+    net.set_optimizer("ADAMW")
     net.compile()
-    net.randomize_weights()
+    
+    # 2. Engage C++ zero-energy bypass and mu caching
+    # net.set_mu_cache_threshold(0) 
+    
+    net.randomize_weights("uniform(-0.3,0.3)")
 
-    print(f"\n*** FULL DKP-PC RUN ***")
-    print(f"Training DKPPCN: {EPOCHS} epochs, inference_steps={INFERENCE_STEPS}, ")
-    print(f"lr={LR}, ir={IR}, lmbda={LMBDA}, decay_rate={DECAY_RATE}...\n")
+    print(f"\nTraining with FORWARD-PROJECTION init: {EPOCHS} epochs, {STEPS} steps, "
+          f"lr={LR}, decay_rate={DECAY_RATE}...\n")
+    print("Reference (ngc-learn, real run): 26.91, 42.96, 60.12, 75.20, 84.68, 89.52,")
+    print("  91.90, 93.45, 94.30, 94.80, 95.13, 95.38, 95.63, 95.74, 95.95 -- test 95.09%\n")
 
     rng = np.random.default_rng(SEED)
     n_batches = len(X_train) // BATCH_SIZE
@@ -77,10 +81,8 @@ def main() -> None:
     for epoch in range(EPOCHS):
         current_lr = LR * (DECAY_RATE ** epoch)
         net.set_learning_rate(current_lr)
-        
-        current_fl = FL * (DECAY_RATE ** epoch)
-        net.set_feedback_rate(current_fl)
 
+        # Standard randomized batches
         indices = rng.permutation(len(X_train))
         X_shuf, Y_shuf = X_train[indices], Y_train[indices]
 
@@ -92,15 +94,22 @@ def main() -> None:
             X_batch = X_shuf[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
             Y_batch = Y_shuf[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
 
-            energy = net.train_step(X_batch, Y_batch, INFERENCE_STEPS)
+            # 3. Call C++ Native Loop (avoid Nanobind overhead)
+            compute_energy = (b == n_batches - 1)
+            energy = net.train_step_with_projection(X_batch, Y_batch, STEPS, compute_energy)
             epoch_energy += energy
+
 
         N_ACC_BATCHES = 10
         for b in range(min(N_ACC_BATCHES, n_batches)):
             X_batch = X_shuf[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
             Y_batch = Y_shuf[b * BATCH_SIZE:(b + 1) * BATCH_SIZE]
 
-            terminal_beliefs = net.predict(X_batch, INFERENCE_STEPS).reshape(BATCH_SIZE, 10)
+            net.reset_state()
+            net.clamp_input(X_batch)
+            flat_beliefs = net.predict_with_projection(X_batch, STEPS)
+            terminal_beliefs = flat_beliefs.reshape(BATCH_SIZE, 10)
+
             pred = np.argmax(terminal_beliefs, axis=1)
             true = np.argmax(Y_batch, axis=1)
             correct += np.sum(pred == true)
@@ -115,7 +124,7 @@ def main() -> None:
     train_time = perf_counter() - start_time
     print(f"\nTraining complete in {train_time:.1f}s.")
 
-    print("\nRunning final test evaluation...")
+    print("\nRunning final test evaluation (with forward-projection init)...")
     correct = 0
     total = 0
     for i in range(0, len(X_test), BATCH_SIZE):
@@ -124,15 +133,20 @@ def main() -> None:
         if len(X_batch) != BATCH_SIZE:
             continue
 
-        terminal_beliefs = net.predict(X_batch, INFERENCE_STEPS).reshape(BATCH_SIZE, 10)
+        net.reset_state()
+        net.clamp_input(X_batch)
+        flat_beliefs = net.predict_with_projection(X_batch, STEPS)
+        terminal_beliefs = flat_beliefs.reshape(BATCH_SIZE, 10)
+
         pred_classes = np.argmax(terminal_beliefs, axis=1)
         correct += np.sum(pred_classes == y_labels_batch)
         total += BATCH_SIZE
 
     test_acc = 100.0 * correct / total
     print(f"\n=== Result ===")
-    print(f"DKPPCN test accuracy: {test_acc:.2f}%")
+    print(f"Deepity Peak Test Accuracy: {test_acc:.2f}%   (ngc-learn: 95.09%)")
     print(f"Train time: {train_time:.1f}s")
+    print(f"\nDeepity per-epoch: {[round(a,2) for a in epoch_accs]}")
 
 if __name__ == "__main__":
     main()

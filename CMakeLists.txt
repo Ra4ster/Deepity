@@ -144,6 +144,10 @@ endif()
 if(DEEPITY_ENABLE_CUDA)
     find_package(CUDAToolkit QUIET)
     if(CUDAToolkit_FOUND)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+        set(CMAKE_CUDA_ARCHITECTURES 86)
         message(STATUS "CUDA support enabled.")
     else()
         message(STATUS "CUDA toolkit not found. Building CPU-only.")
@@ -199,10 +203,6 @@ else()
     set(DEEPITY_BLAS_RESOLVED FALSE)
 
     if(DEEPITY_USE_MKL)
-        # Modern, recommended integration: Intel's own MKLConfig.cmake,
-        # present if oneAPI/MKL is properly installed and sourced (e.g.
-        # via `source /opt/intel/oneapi/setvars.sh`). Exposes a single
-        # target (MKL::MKL) with both include dirs and link libraries.
         find_package(MKL CONFIG QUIET)
         if(MKL_FOUND)
             message(STATUS "Using Intel MKL (found via MKLConfig.cmake).")
@@ -275,6 +275,10 @@ add_library(Deepity
     src/DirectKPPCNetwork.cpp
     src/ModelIO.cpp
     src/StreamAlignedBatcher.cpp
+    src/backend/Backend.cpp
+    src/backend/CPUBackend.cpp
+    src/backend/CUDABackend.cu
+    src/backend/Tensor.cpp
 )
 
 if(DEEPITY_USE_MKL AND DEEPITY_BLAS_RESOLVED)
@@ -303,6 +307,28 @@ if(CUDAToolkit_FOUND)
 endif()
 
 target_compile_definitions(Deepity PUBLIC SLEEF_STATIC_LIBS)
+
+# --- Optiona: Use Google Benchmark -----------------------------------
+
+include(FetchContent)
+FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG v1.9.1
+)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(benchmark)
+
+# --- Tests -----------------------------------------------------------
+
+option(DEEPITY_BUILD_TESTS "Build test/verification executables" ON)
+
+add_executable(ActivationBenchmark tests/tActivations.cpp)
+target_link_libraries(ActivationBenchmark PRIVATE Deepity benchmark::benchmark)
+set_target_properties(ActivationBenchmark PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+add_test(NAME ActivationBenchmark COMMAND ActivationBenchmark)
 
 # --- Compiler flags -------------------------------------------------
 

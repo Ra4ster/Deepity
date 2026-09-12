@@ -2,15 +2,21 @@
 #include <pmmintrin.h>
 #include <xmmintrin.h>
 #include <omp.h>
+#include <iostream>
 
 namespace Deep
 {
-    SimplePCNetwork::SimplePCNetwork(int batchSize) noexcept : batchSize(batchSize) {}
+    SimplePCNetwork::SimplePCNetwork(int batchSize, DeviceType device) noexcept
+        : device(device), batchSize(batchSize)
+    {
+        backend = CreateBackend(device);
+    }
 
     void SimplePCNetwork::AddLayer(int size, int nextSize, float lr, float ir, float lmbda,
                                    void (*act)(float *, size_t), void (*dAct)(float *, size_t, bool))
     {
-        std::unique_ptr<SimplePCLayer> l = std::make_unique<SimplePCLayer>(size, nextSize, batchSize, lr, ir, lmbda, act, dAct);
+        std::unique_ptr<SimplePCLayer> l = std::make_unique<SimplePCLayer>(
+            size, nextSize, batchSize, lr, ir, lmbda, act, dAct, backend.get());
 
         if (!layers.empty())
         {
@@ -23,7 +29,8 @@ namespace Deep
     void SimplePCNetwork::AddLayer(int size, int nextSize, float lr, float ir, float lmbda,
                                    ActivationType aType, ActivationType dType)
     {
-        std::unique_ptr<SimplePCLayer> l = std::make_unique<SimplePCLayer>(size, nextSize, batchSize, lr, ir, lmbda, aType, dType);
+        std::unique_ptr<SimplePCLayer> l = std::make_unique<SimplePCLayer>(
+            size, nextSize, batchSize, lr, ir, lmbda, aType, dType, backend.get());
 
         if (!layers.empty())
         {
@@ -31,6 +38,12 @@ namespace Deep
             l->SetLayerBelow(layers.back().get());
         }
         layers.push_back(std::move(l));
+    }
+
+    void SimplePCNetwork::RandomizeWeights(std::mt19937 &rng, const char *distribution)
+    {
+        for (auto &l : layers)
+            l->RandomizeWeights(rng, distribution);
     }
 
     void SimplePCNetwork::RandomizeWeights(std::mt19937 &rng)
@@ -50,12 +63,12 @@ namespace Deep
         layers.front()->ClampState(input);
     }
 
-    float SimplePCNetwork::CalculateState()
+    float SimplePCNetwork::CalculateState(bool needEnergy)
     {
         float e = 0.0f;
         for (size_t i = 0; i < layers.size(); i++)
-            e += layers[i]->CalculateState();
-        return e;
+            e += layers[i]->CalculateState(needEnergy);
+        return needEnergy ? e : 0.0f;
     }
 
     void SimplePCNetwork::UpdateState()
@@ -78,11 +91,11 @@ namespace Deep
 
         for (int t = 0; t < inferenceSteps; t++)
         {
-            CalculateState();
+            CalculateState(false);
             UpdateState();
         }
 
-        float finalEnergy = CalculateState();
+        float finalEnergy = CalculateState(true);
 
         UpdateWeights();
         GetTerminalLayer()->UnclampState();
@@ -105,7 +118,9 @@ namespace Deep
         const float *beliefs = terminal->GetBeliefs();
         size_t count = terminal->GetBatchSize() * terminal->GetInputSize();
 
-        return std::vector<float>(beliefs, beliefs + count);
+        std::vector<float> result(count);
+        backend->CopyToHost(result.data(), beliefs, count);
+        return result;
     }
 
     void SimplePCNetwork::ProjectForward() noexcept
@@ -114,30 +129,74 @@ namespace Deep
         {
             layers[i]->ComputeMuOnly();
 
+            if (layers[i + 1]->IsClamped())
+                continue; // never overwrite a clamped layer's real target with a forward guess
+
             const float *mu = layers[i]->GetMu();
             float *nextZ = layers[i + 1]->GetBeliefs();
             size_t n = layers[i]->GetBatchSize() * layers[i]->GetOutputSize();
 
-            std::memcpy(nextZ, mu, n * sizeof(float));
+            backend->Copy(nextZ, mu, n);
         }
     }
 
-    float SimplePCNetwork::TrainStepWithProjection(const std::vector<float> &x, const std::vector<float> &y, int inferenceSteps)
+    float SimplePCNetwork::TrainStepWithProjection(const std::vector<float> &x, const std::vector<float> &y, int inferenceSteps, bool computeEnergy)
     {
         ResetState();
         Clamp(x);
-        ProjectForward();
         GetTerminalLayer()->ClampState(y);
 
-        float finalEnergy = 0.0f;
-        for (int t = 0; t < inferenceSteps; ++t)
+        if (device == DeviceType::DEVICE_GPU)
         {
-            CalculateState();
-            UpdateState();
+            if (!graphCaptured || capturedInferenceSteps != inferenceSteps)
+            {
+                backend->BeginGraphCapture();
+                ProjectForward();
+                for (int t = 0; t < inferenceSteps; ++t)
+                {
+                    CalculateState(false);
+                    UpdateState();
+                }
+                UpdateWeights();
+                bool captureOk = backend->EndGraphCapture();
+
+                if (captureOk)
+                {
+                    graphCaptured = true;
+                    capturedInferenceSteps = inferenceSteps;
+                }
+                else
+                {
+                    std::cerr << "Graph capture failed -- falling back to non-graph execution for this call.\n";
+                }
+            }
+
+            if (graphCaptured)
+            {
+                backend->ReplayGraph();
+            }
+            else
+            {
+                for (int t = 0; t < inferenceSteps; ++t)
+                {
+                    CalculateState(false);
+                    UpdateState();
+                }
+                UpdateWeights();
+            }
+        }
+        else
+        {
+            ProjectForward();
+            for (int t = 0; t < inferenceSteps; ++t)
+            {
+                CalculateState(false);
+                UpdateState();
+            }
+            UpdateWeights();
         }
 
-        finalEnergy = CalculateState();
-        UpdateWeights();
+        float finalEnergy = CalculateState(computeEnergy);
         GetTerminalLayer()->UnclampState();
 
         return finalEnergy;
@@ -147,11 +206,11 @@ namespace Deep
     {
         ResetState();
         Clamp(x);
-        ProjectForward(); // Add your forward projection initialization here
+        ProjectForward();
 
         for (int t = 0; t < inferenceSteps; t++)
         {
-            CalculateState();
+            CalculateState(false);
             UpdateState();
         }
 
@@ -159,7 +218,9 @@ namespace Deep
         const float *beliefs = terminal->GetBeliefs();
         size_t count = terminal->GetBatchSize() * terminal->GetInputSize();
 
-        return std::vector<float>(beliefs, beliefs + count);
+        std::vector<float> result(count);
+        backend->CopyToHost(result.data(), beliefs, count);
+        return result;
     }
 
     void SimplePCNetwork::SetMuCacheThreshold(float threshold) noexcept
@@ -171,7 +232,7 @@ namespace Deep
     void SimplePCNetwork::Compile()
     {
 #pragma omp parallel
-        { // Broadcast FTZ/DAZ hardware flags to ALL OpenMP worker threads
+        {
             _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
             _MM_SET_DENORMALS_ZERO_MODE(_MM_DENORMALS_ZERO_ON);
         }
@@ -179,8 +240,21 @@ namespace Deep
         for (auto &layer : layers)
             total_floats_needed += layer->GetRequiredFloats();
 
-        arena = std::make_unique<MemoryArena>(total_floats_needed, true);
-        for (auto &layer : layers)
-            layer->BindMemory(*arena);
+        backend->PrepareForBatchSize(batchSize);
+
+        if (device == DeviceType::DEVICE_CPU)
+        {
+            cpuArena = std::make_unique<MemoryArena>(total_floats_needed, true);
+            for (auto &layer : layers)
+                layer->BindMemory(*cpuArena);
+        }
+#if defined(DEEPITY_USE_CUDA)
+        else
+        {
+            gpuArena = std::make_unique<DeviceMemoryArena>(backend.get(), total_floats_needed);
+            for (auto &layer : layers)
+                layer->BindMemory(*gpuArena);
+        }
+#endif
     }
 }
