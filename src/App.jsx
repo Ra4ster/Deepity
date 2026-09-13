@@ -4,9 +4,10 @@ import NotFound from "./NotFound";
 import "./index.css";
 
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import TutorialLanding from "./TutorialLanding";
 import Tutorial0_Intro from "./components/tutorials/Tutorial0_Intro";
+import SplashScreen from "./components/SplashScreen";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -17,8 +18,12 @@ function ScrollToTop() {
 }
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
+
   return (
     <>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+
       <div style={{ position: "relative", zIndex: 1 }}>
         <BrowserRouter basename="/Deepity">
           <ScrollToTop />
