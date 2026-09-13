@@ -135,4 +135,50 @@ static void BM_Std_Relu(benchmark::State &state)
 }
 BENCHMARK(BM_Std_Relu)->Arg(256)->Arg(512)->Arg(784)->Arg(16384)->Arg(131072);
 
+// ─── gelu ────────────────────────────────────────────────────────────
+
+static void BM_Deep_Gelu(benchmark::State &state)
+{
+    size_t n = state.range(0);
+    std::vector<float> original = MakeRandomInput(n);
+    std::vector<float> working(n);
+
+    for (auto _ : state)
+    {
+        state.PauseTiming();
+        std::memcpy(working.data(), original.data(), n * sizeof(float));
+        state.ResumeTiming();
+
+        Deep::gelu(working.data(), working.size());
+        benchmark::DoNotOptimize(working.data());
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+}
+BENCHMARK(BM_Deep_Gelu)->Arg(256)->Arg(512)->Arg(784)->Arg(16384)->Arg(131072);
+
+static void BM_Std_Gelu(benchmark::State &state)
+{
+    size_t n = state.range(0);
+    std::vector<float> original = MakeRandomInput(n);
+    std::vector<float> working(n);
+
+    constexpr float MAGIC_GELU_1 = 0.7978845608f;
+    constexpr float MAGIC_GELU_2 = 0.044715f;
+    for (auto _ : state)
+    {
+        state.PauseTiming();
+        std::memcpy(working.data(), original.data(), n * sizeof(float));
+        state.ResumeTiming();
+
+        for (auto &v : working)
+        {
+            float inner = MAGIC_GELU_1 * v + (MAGIC_GELU_2 * MAGIC_GELU_1) * v * v * v;
+            v *= 0.5f * (1.0f + std::tanhf(inner));
+        }
+        benchmark::DoNotOptimize(working.data());
+    }
+    state.SetItemsProcessed(state.iterations() * n);
+}
+BENCHMARK(BM_Std_Gelu)->Arg(256)->Arg(512)->Arg(784)->Arg(16384)->Arg(131072);
+
 BENCHMARK_MAIN();

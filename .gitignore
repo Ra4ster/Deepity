@@ -28,3 +28,4 @@ wheelhouse/
 dist/
 *.egg-info/
 _skbuild/
+logs/
